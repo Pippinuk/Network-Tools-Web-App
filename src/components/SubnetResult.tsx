@@ -29,12 +29,14 @@ interface SubnetResultProps {
     hostsCount: number;
   }>;
   originalSubnet: string;
+  calculationMethod?: 'vlans' | 'mask';
   className?: string;
 }
 
 const SubnetResult: React.FC<SubnetResultProps> = ({ 
   subnets,
   originalSubnet,
+  calculationMethod = 'vlans',
   className
 }) => {
   const [expandedSubnet, setExpandedSubnet] = useState<string | null>(null);
@@ -56,12 +58,17 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
 
   if (!subnets.length) return null;
 
+  const targetMask = subnets[0].subnet.split('/')[1];
+
   return (
     <div className={cn('glass-panel p-6 space-y-6 w-full opacity-0 animate-slide-up', className)} style={{animationFillMode: 'forwards', animationDelay: '0.2s'}}>
       <div className="space-y-2">
         <h3 className="text-lg font-medium">Subnet Results</h3>
         <p className="text-sm text-muted-foreground">
-          Original subnet {originalSubnet} divided into {subnets.length} equal parts
+          {calculationMethod === 'vlans' 
+            ? `Original subnet ${originalSubnet} divided into ${subnets.length} equal parts`
+            : `Original subnet ${originalSubnet} divided into /${targetMask} subnets (${subnets.length} total)`
+          }
         </p>
         <Separator className="my-4" />
       </div>
@@ -78,7 +85,7 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded-full">
-                    Clan {index + 1}
+                    {calculationMethod === 'vlans' ? `VLAN ${index + 1}` : `Subnet ${index + 1}`}
                   </span>
                   <h4 className="font-medium">{subnet.subnet}</h4>
                 </div>

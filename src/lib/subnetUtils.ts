@@ -100,6 +100,16 @@ export const bitsNeededForSubnets = (subnetCount: number): number => {
 };
 
 /**
+ * Calculate the number of possible subnets from supernet to subnet
+ */
+export const calculateSubnetCount = (supernetPrefix: number, subnetPrefix: number): number => {
+  if (subnetPrefix <= supernetPrefix) {
+    throw new Error("Subnet prefix must be larger than supernet prefix");
+  }
+  return Math.pow(2, subnetPrefix - supernetPrefix);
+};
+
+/**
  * Divides a subnet into smaller, equal-sized subnets
  */
 export const divideSubnet = (subnet: string, divisions: number): Array<{
@@ -143,6 +153,62 @@ export const divideSubnet = (subnet: string, divisions: number): Array<{
     
     subnets.push({
       subnet: `${networkAddress}/${newPrefix}`,
+      networkAddress,
+      broadcastAddress,
+      firstUsableHost,
+      lastUsableHost,
+      hostsCount
+    });
+  }
+  
+  return subnets;
+};
+
+/**
+ * Divides a subnet by a specific subnet mask
+ */
+export const divideSubnetByMask = (subnet: string, targetPrefix: number): Array<{
+  subnet: string;
+  networkAddress: string;
+  broadcastAddress: string;
+  firstUsableHost: string;
+  lastUsableHost: string;
+  hostsCount: number;
+}> => {
+  const [baseIp, basePrefix] = subnet.split('/');
+  const basePrefixNum = parseInt(basePrefix, 10);
+  
+  if (targetPrefix <= basePrefixNum) {
+    throw new Error("Target prefix must be larger than the original prefix");
+  }
+  
+  if (targetPrefix > 30) {
+    throw new Error("Target prefix would not leave usable hosts (max is /30)");
+  }
+  
+  // Calculate the number of subnets
+  const subnetsCount = Math.pow(2, targetPrefix - basePrefixNum);
+  
+  // Calculate the size of each subnet
+  const baseIpNum = ipToNumber(getNetworkAddress(baseIp, basePrefixNum));
+  const subnetSize = Math.pow(2, 32 - targetPrefix);
+  
+  // Create the subnets
+  const subnets = [];
+  
+  // Generate all subnets based on the target prefix
+  for (let i = 0; i < subnetsCount; i++) {
+    const subnetStartIp = baseIpNum + (i * subnetSize);
+    const subnetStartIpStr = numberToIp(subnetStartIp);
+    
+    const networkAddress = subnetStartIpStr;
+    const broadcastAddress = numberToIp(subnetStartIp + subnetSize - 1);
+    const firstUsableHost = numberToIp(subnetStartIp + 1);
+    const lastUsableHost = numberToIp(subnetStartIp + subnetSize - 2);
+    const hostsCount = getHostsCount(targetPrefix);
+    
+    subnets.push({
+      subnet: `${networkAddress}/${targetPrefix}`,
       networkAddress,
       broadcastAddress,
       firstUsableHost,

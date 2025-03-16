@@ -5,7 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
 import SubnetResult from '@/components/SubnetResult';
-import { divideSubnet } from '@/lib/subnetUtils';
+import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
 import { Network, Github } from 'lucide-react';
 
 interface SubnetInfo {
@@ -21,6 +21,7 @@ const Index = () => {
   const [subnets, setSubnets] = useState<SubnetInfo[]>([]);
   const [originalSubnet, setOriginalSubnet] = useState('');
   const [hasCalculated, setHasCalculated] = useState(false);
+  const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
 
   const handleCalculate = (subnet: string, divisions: number) => {
     try {
@@ -28,6 +29,19 @@ const Index = () => {
       setSubnets(results);
       setOriginalSubnet(subnet);
       setHasCalculated(true);
+      setCalculationMethod('vlans');
+    } catch (error) {
+      console.error('Calculation error:', error);
+    }
+  };
+
+  const handleCalculateByMask = (subnet: string, targetPrefix: number) => {
+    try {
+      const results = divideSubnetByMask(subnet, targetPrefix);
+      setSubnets(results);
+      setOriginalSubnet(subnet);
+      setHasCalculated(true);
+      setCalculationMethod('mask');
     } catch (error) {
       console.error('Calculation error:', error);
     }
@@ -65,12 +79,16 @@ const Index = () => {
         </section>
 
         <div className="max-w-5xl mx-auto space-y-8">
-          <SubnetForm onCalculate={handleCalculate} />
+          <SubnetForm 
+            onCalculate={handleCalculate}
+            onCalculateByMask={handleCalculateByMask}
+          />
           
           {hasCalculated && (
             <SubnetResult 
               subnets={subnets} 
               originalSubnet={originalSubnet}
+              calculationMethod={calculationMethod}
             />
           )}
         </div>

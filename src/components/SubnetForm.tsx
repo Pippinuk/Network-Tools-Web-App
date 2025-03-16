@@ -5,25 +5,56 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { isValidSubnet } from '@/lib/subnetUtils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isValidSubnet, calculateSubnetCount } from '@/lib/subnetUtils';
 import { cn } from '@/lib/utils';
-import { Network, Users, SplitSquareVertical } from 'lucide-react';
+import { Network, Users, SplitSquareVertical, Divide } from 'lucide-react';
 
 interface SubnetFormProps {
   onCalculate: (subnet: string, divisions: number) => void;
+  onCalculateByMask: (subnet: string, targetPrefix: number) => void;
   className?: string;
 }
 
-const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, className }) => {
+const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask, className }) => {
   const [subnet, setSubnet] = useState('');
   const [divisions, setDivisions] = useState(4);
+  const [targetPrefix, setTargetPrefix] = useState(24);
+  const [maxPrefix, setMaxPrefix] = useState(30);
+  const [minPrefix, setMinPrefix] = useState(0);
   const [isValid, setIsValid] = useState(false);
+  const [calculationMode, setCalculationMode] = useState<'vlans' | 'mask'>('vlans');
+  const [subnetCount, setSubnetCount] = useState<number | null>(null);
   const { toast } = useToast();
   
   // Validate subnet whenever input changes
   useEffect(() => {
-    setIsValid(isValidSubnet(subnet));
+    const valid = isValidSubnet(subnet);
+    setIsValid(valid);
+    
+    // If valid, set the min and max prefix values
+    if (valid) {
+      const prefix = parseInt(subnet.split('/')[1], 10);
+      setMinPrefix(prefix + 1);
+      setMaxPrefix(30); // Maximum useful subnet mask is /30 (4 addresses, 2 usable)
+      setTargetPrefix(Math.min(Math.max(prefix + 1, targetPrefix), 30));
+    }
   }, [subnet]);
+
+  // Calculate subnet count when target prefix changes
+  useEffect(() => {
+    if (isValid && calculationMode === 'mask') {
+      try {
+        const prefix = parseInt(subnet.split('/')[1], 10);
+        const count = calculateSubnetCount(prefix, targetPrefix);
+        setSubnetCount(count);
+      } catch (error) {
+        setSubnetCount(null);
+      }
+    } else {
+      setSubnetCount(null);
+    }
+  }, [subnet, targetPrefix, isValid, calculationMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,18 +68,29 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, className }) => {
       return;
     }
     
-    onCalculate(subnet, divisions);
-    
-    toast({
-      title: "Subnets Calculated",
-      description: `Divided ${subnet} into ${divisions} subnets`,
-    });
+    if (calculationMode === 'vlans') {
+      onCalculate(subnet, divisions);
+      toast({
+        title: "Subnets Calculated",
+        description: `Divided ${subnet} into ${divisions} subnets`,
+      });
+    } else {
+      onCalculateByMask(subnet, targetPrefix);
+      toast({
+        title: "Subnets Calculated",
+        description: `Divided ${subnet} into /${targetPrefix} subnets`,
+      });
+    }
   };
 
   const handleReset = () => {
     setSubnet('');
     setDivisions(4);
+    setTargetPrefix(24);
+    setSubnetCount(null);
   };
+
+  const prefix = isValid ? parseInt(subnet.split('/')[1], 10) : 0;
 
   return (
     <form 
@@ -72,31 +114,80 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, className }) => {
         </p>
       </div>
 
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <Label htmlFor="divisions" className="flex items-center gap-2 text-base">
+      <Tabs value={calculationMode} onValueChange={(value) => setCalculationMode(value as 'vlans' | 'mask')} className="w-full">
+        <TabsList className="grid grid-cols-2 w-full">
+          <TabsTrigger value="vlans" className="flex items-center gap-2">
             <Users className="size-4" />
-            <span>Number of VLANs</span>
-          </Label>
-          <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
-            {divisions}
-          </span>
-        </div>
+            <span>By VLANs</span>
+          </TabsTrigger>
+          <TabsTrigger value="mask" className="flex items-center gap-2">
+            <Divide className="size-4" />
+            <span>By Mask</span>
+          </TabsTrigger>
+        </TabsList>
         
-        <Slider
-          id="divisions"
-          min={2}
-          max={16}
-          step={1}
-          value={[divisions]}
-          onValueChange={(value) => setDivisions(value[0])}
-          className="py-4"
-        />
+        <TabsContent value="vlans" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="divisions" className="flex items-center gap-2 text-base">
+              <Users className="size-4" />
+              <span>Number of VLANs</span>
+            </Label>
+            <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
+              {divisions}
+            </span>
+          </div>
+          
+          <Slider
+            id="divisions"
+            min={2}
+            max={16}
+            step={1}
+            value={[divisions]}
+            onValueChange={(value) => setDivisions(value[0])}
+            className="py-4"
+          />
+          
+          <p className="text-xs text-muted-foreground">
+            How many VLANs do you want to divide this subnet into?
+          </p>
+        </TabsContent>
         
-        <p className="text-xs text-muted-foreground">
-          How many VLANs do you want to divide this subnet into?
-        </p>
-      </div>
+        <TabsContent value="mask" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="targetPrefix" className="flex items-center gap-2 text-base">
+              <Divide className="size-4" />
+              <span>Target Subnet Mask</span>
+            </Label>
+            <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
+              /{targetPrefix}
+            </span>
+          </div>
+          
+          {isValid && (
+            <Slider
+              id="targetPrefix"
+              min={minPrefix}
+              max={maxPrefix}
+              step={1}
+              value={[targetPrefix]}
+              onValueChange={(value) => setTargetPrefix(value[0])}
+              className="py-4"
+              disabled={!isValid}
+            />
+          )}
+          
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Original: /{prefix}</span>
+            <span>Target: /{targetPrefix}</span>
+          </div>
+          
+          {subnetCount !== null && (
+            <div className="bg-primary/5 p-3 rounded-md text-sm">
+              <p>This will create <strong>{subnetCount}</strong> subnets with <strong>{Math.pow(2, 32 - targetPrefix) - 2}</strong> usable hosts each.</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <div className="flex gap-4 pt-2">
         <Button 
