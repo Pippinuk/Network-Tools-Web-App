@@ -76,7 +76,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, className }) => {
         <div className="flex justify-between items-center">
           <Label htmlFor="divisions" className="flex items-center gap-2 text-base">
             <Users className="size-4" />
-            <span>Number of Clans</span>
+            <span>Number of VLANs</span>
           </Label>
           <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
             {divisions}
@@ -94,7 +94,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, className }) => {
         />
         
         <p className="text-xs text-muted-foreground">
-          How many clans do you want to divide this subnet into?
+          How many VLANs do you want to divide this subnet into?
         </p>
       </div>
 

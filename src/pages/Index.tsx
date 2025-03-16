@@ -56,10 +56,10 @@ const Index = () => {
               IP Subnet Management
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-              Divide IP Subnets for Your Clans
+              Divide IP Subnets for Your VLANs
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Enter your IP subnet in CIDR notation and divide it into equal subnets for each clan, with detailed network information.
+              Enter your IP subnet in CIDR notation and divide it into equal subnets for each VLAN, with detailed network information.
             </p>
           </div>
         </section>
