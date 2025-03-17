@@ -18,6 +18,7 @@ interface SubnetFormProps {
 
 const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask, className }) => {
   const [subnet, setSubnet] = useState('');
+  const [divisionsInput, setDivisionsInput] = useState('4');
   const [divisions, setDivisions] = useState(4);
   const [targetPrefix, setTargetPrefix] = useState(24);
   const [maxPrefix, setMaxPrefix] = useState(30);
@@ -69,10 +70,21 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
     }
     
     if (calculationMode === 'vlans') {
-      onCalculate(subnet, divisions);
+      // Ensure we have a valid number of divisions
+      const divs = parseInt(divisionsInput, 10);
+      if (isNaN(divs) || divs < 2) {
+        toast({
+          title: "Invalid Input",
+          description: "Please enter a valid number of VLANs (minimum 2)",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      onCalculate(subnet, divs);
       toast({
         title: "Subnets Calculated",
-        description: `Divided ${subnet} into ${divisions} subnets`,
+        description: `Divided ${subnet} into ${divs} subnets`,
       });
     } else {
       onCalculateByMask(subnet, targetPrefix);
@@ -85,15 +97,20 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
 
   const handleReset = () => {
     setSubnet('');
+    setDivisionsInput('');
     setDivisions(4);
     setTargetPrefix(24);
     setSubnetCount(null);
   };
 
   const handleDivisionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value, 10);
-    if (!isNaN(value) && value >= 2 && value <= 1024) {
-      setDivisions(value);
+    const value = e.target.value;
+    setDivisionsInput(value);
+    
+    // Also update the numeric value if it's valid
+    const numValue = parseInt(value, 10);
+    if (!isNaN(numValue)) {
+      setDivisions(numValue);
     }
   };
 
@@ -146,7 +163,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
             type="number"
             min={2}
             max={1024}
-            value={divisions}
+            value={divisionsInput}
             onChange={handleDivisionsChange}
             className="input-glass"
           />
@@ -197,7 +214,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
         <Button 
           type="submit" 
           className="flex-1 gap-2"
-          disabled={!isValid}
+          disabled={!isValid || (calculationMode === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))}
         >
           <SplitSquareVertical className="size-4" />
           <span>Slice Subnet</span>
