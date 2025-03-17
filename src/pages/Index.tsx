@@ -1,13 +1,15 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
 import SubnetResult from '@/components/SubnetResult';
-import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
+import Navigation from '@/components/Navigation';
 import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
-import { Network, Github } from 'lucide-react';
+import { Network, Github, Server } from 'lucide-react';
 
 interface SubnetInfo {
   subnet: string;
@@ -19,6 +21,7 @@ interface SubnetInfo {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const [subnets, setSubnets] = useState<SubnetInfo[]>([]);
   const [originalSubnet, setOriginalSubnet] = useState('');
   const [hasCalculated, setHasCalculated] = useState(false);
@@ -48,10 +51,22 @@ const Index = () => {
     }
   };
 
+  const handleVossConfigRedirect = () => {
+    // Store subnet data in sessionStorage to be retrieved in the VOSS config page
+    sessionStorage.setItem('subnets', JSON.stringify(subnets));
+    sessionStorage.setItem('originalSubnet', originalSubnet);
+    
+    // Navigate to the VOSS config page
+    navigate('/voss-config');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex flex-col theme-transition">
       <header className="w-full max-w-7xl mx-auto flex justify-between items-center p-6">
-        <Logo />
+        <div className="flex items-center">
+          <Navigation />
+          <Logo />
+        </div>
         <a
           href="https://github.com"
           target="_blank"
@@ -93,10 +108,16 @@ const Index = () => {
                 calculationMethod={calculationMethod}
               />
               
-              <VOSSConfigGenerator 
-                subnets={subnets}
-                originalSubnet={originalSubnet}
-              />
+              <div className="flex justify-center mt-8">
+                <Button 
+                  onClick={handleVossConfigRedirect}
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Server className="size-4" />
+                  Create VOSS VRRP Configuration
+                </Button>
+              </div>
             </>
           )}
         </div>
