@@ -11,13 +11,15 @@ import {
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { Check, Copy, ChevronsUpDown, Mail, Share2 } from 'lucide-react';
+import { subnetsToCsv, downloadFile, prefixToSubnetMask } from '@/lib/exportUtils';
+import { Check, Copy, ChevronsUpDown, FileDown, Share2 } from 'lucide-react';
 import { 
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { formatNumber } from '@/lib/subnetUtils';
+import { useToast } from '@/components/ui/use-toast';
 
 interface SubnetResultProps {
   subnets: Array<{
@@ -41,6 +43,7 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
 }) => {
   const [expandedSubnet, setExpandedSubnet] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -56,6 +59,27 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
     }
   };
 
+  const handleExportCsv = () => {
+    try {
+      const csvData = subnetsToCsv(subnets, originalSubnet, calculationMethod);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `subnet-slices-${timestamp}.csv`;
+      downloadFile(csvData, filename, 'text/csv');
+      
+      toast({
+        title: "Export Successful",
+        description: `Exported ${subnets.length} subnets to ${filename}`,
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        title: "Export Failed",
+        description: "Failed to export subnet data",
+        variant: "destructive"
+      });
+    }
+  };
+
   if (!subnets.length) return null;
 
   const targetMask = subnets[0].subnet.split('/')[1];
@@ -63,7 +87,18 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
   return (
     <div className={cn('glass-panel p-6 space-y-6 w-full opacity-0 animate-slide-up', className)} style={{animationFillMode: 'forwards', animationDelay: '0.2s'}}>
       <div className="space-y-2">
-        <h3 className="text-lg font-medium">Subnet Results</h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-medium">Subnet Results</h3>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportCsv}
+            className="gap-2 text-sm"
+          >
+            <FileDown className="size-4" />
+            <span>Export CSV</span>
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">
           {calculationMethod === 'vlans' 
             ? `Original subnet ${originalSubnet} divided into ${subnets.length} equal parts`
@@ -134,6 +169,25 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
                           className="size-7"
                         >
                           {copiedText === subnet.networkAddress ? (
+                            <Check className="size-3 text-green-500" />
+                          ) : (
+                            <Copy className="size-3" />
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                    
+                    <TableRow>
+                      <TableCell className="font-medium">Subnet Mask</TableCell>
+                      <TableCell className="font-mono">{prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10))}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={() => handleCopy(prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10)))}
+                          className="size-7"
+                        >
+                          {copiedText === prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10)) ? (
                             <Check className="size-3 text-green-500" />
                           ) : (
                             <Copy className="size-3" />
