@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
 import SubnetResult from '@/components/SubnetResult';
+import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
 import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
 import { Network, Github } from 'lucide-react';
 
@@ -85,11 +86,18 @@ const Index = () => {
           />
           
           {hasCalculated && (
-            <SubnetResult 
-              subnets={subnets} 
-              originalSubnet={originalSubnet}
-              calculationMethod={calculationMethod}
-            />
+            <>
+              <SubnetResult 
+                subnets={subnets} 
+                originalSubnet={originalSubnet}
+                calculationMethod={calculationMethod}
+              />
+              
+              <VOSSConfigGenerator 
+                subnets={subnets}
+                originalSubnet={originalSubnet}
+              />
+            </>
           )}
         </div>
       </main>
