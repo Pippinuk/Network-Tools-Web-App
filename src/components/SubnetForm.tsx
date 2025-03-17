@@ -90,6 +90,13 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
     setSubnetCount(null);
   };
 
+  const handleDivisionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value, 10);
+    if (!isNaN(value) && value >= 2 && value <= 1024) {
+      setDivisions(value);
+    }
+  };
+
   const prefix = isValid ? parseInt(subnet.split('/')[1], 10) : 0;
 
   return (
@@ -132,23 +139,20 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
               <Users className="size-4" />
               <span>Number of VLANs</span>
             </Label>
-            <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
-              {divisions}
-            </span>
           </div>
           
-          <Slider
+          <Input
             id="divisions"
+            type="number"
             min={2}
-            max={16}
-            step={1}
-            value={[divisions]}
-            onValueChange={(value) => setDivisions(value[0])}
-            className="py-4"
+            max={1024}
+            value={divisions}
+            onChange={handleDivisionsChange}
+            className="input-glass"
           />
           
           <p className="text-xs text-muted-foreground">
-            How many VLANs do you want to divide this subnet into?
+            How many VLANs do you want to divide this subnet into? (2-1024)
           </p>
         </TabsContent>
         
