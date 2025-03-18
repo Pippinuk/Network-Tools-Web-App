@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
@@ -12,7 +11,8 @@ import { divideSubnet } from '@/lib/subnetUtils';
 import { generateVOSSConfig, downloadFile } from '@/lib/exportUtils';
 import Logo from '@/components/Logo';
 import Navigation from '@/components/Navigation';
-import { Github, Server, Download, Network, Layers } from 'lucide-react';
+import { Github, Server, Download, Network, Layers, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SubnetInfo {
   subnet: string;
@@ -33,6 +33,10 @@ const VOSSConfig = () => {
   const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
   const [hasCalculated, setHasCalculated] = useState(false);
   const { toast } = useToast();
+
+  const isReservedVlanId = (id: number): boolean => {
+    return (id >= 4060 && id <= 4094) || id === 4048;
+  };
 
   // Check for data from SubnetSlicer on component mount
   useEffect(() => {
@@ -115,6 +119,29 @@ const VOSSConfig = () => {
         return;
       }
 
+      // Check if starting VLAN ID is reserved
+      if (isReservedVlanId(startVlanId)) {
+        toast({
+          title: "Reserved VLAN ID",
+          description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Check if VLAN range includes reserved IDs
+      const lastVlanId = startVlanId + numVlans - 1;
+      for (let id = startVlanId; id <= lastVlanId; id++) {
+        if (isReservedVlanId(id)) {
+          toast({
+            title: "Reserved VLAN ID in Range",
+            description: `VLAN IDs ${startVlanId}-${lastVlanId} include reserved IDs (4048 or 4060-4094).`,
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
       if (startVlanId + numVlans - 1 > 4094) {
         toast({
           title: "Invalid Input",
@@ -151,8 +178,49 @@ const VOSSConfig = () => {
     }
   };
 
+  const handleVlanIdChange = (index: number, value: string) => {
+    const newVlanIds = { ...vlanIds };
+    const numValue = parseInt(value, 10);
+    
+    // Check if it's a reserved VLAN ID
+    if (!isNaN(numValue) && numValue > 0 && numValue <= 4094) {
+      if (isReservedVlanId(numValue)) {
+        toast({
+          title: "Reserved VLAN ID",
+          description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      newVlanIds[index] = numValue;
+    } else if (value === '') {
+      delete newVlanIds[index];
+    } else if (!isNaN(numValue)) {
+      toast({
+        title: "Invalid VLAN ID",
+        description: "VLAN ID must be between 1 and 4094",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setVlanIds(newVlanIds);
+  };
+
   const generateConfig = () => {
     if (!hasCalculated || subnets.length === 0) return;
+    
+    // Validate all VLAN IDs before generating config
+    const invalidVlanIds = Object.values(vlanIds).filter(id => isReservedVlanId(id));
+    if (invalidVlanIds.length > 0) {
+      toast({
+        title: "Reserved VLAN IDs",
+        description: "Configuration contains reserved VLAN IDs. Please update them before generating.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     const config = generateVOSSConfig(subnets, vlanIds, useFirstIps);
     downloadFile(config, 'extreme-voss-config.txt', 'text/plain');
@@ -161,19 +229,6 @@ const VOSSConfig = () => {
       title: "Configuration Generated",
       description: "Extreme Networks VOSS configuration downloaded successfully.",
     });
-  };
-
-  const handleVlanIdChange = (index: number, value: string) => {
-    const newVlanIds = { ...vlanIds };
-    const numValue = parseInt(value, 10);
-    
-    if (!isNaN(numValue) && numValue > 0 && numValue <= 4094) {
-      newVlanIds[index] = numValue;
-    } else if (value === '') {
-      delete newVlanIds[index];
-    }
-    
-    setVlanIds(newVlanIds);
   };
 
   return (

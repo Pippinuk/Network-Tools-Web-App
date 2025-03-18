@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { generateVOSSConfig, downloadFile } from '@/lib/exportUtils';
-import { Download, Server, Settings } from 'lucide-react';
+import { Download, Server, Settings, AlertTriangle } from 'lucide-react';
 
 interface VOSSConfigGeneratorProps {
   subnets: Array<{
@@ -25,20 +25,51 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
   const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
   const { toast } = useToast();
 
+  const isReservedVlanId = (id: number): boolean => {
+    return (id >= 4060 && id <= 4094) || id === 4048;
+  };
+
   const handleVlanIdChange = (index: number, value: string) => {
     const newVlanIds = { ...vlanIds };
     const numValue = parseInt(value, 10);
     
     if (!isNaN(numValue) && numValue > 0 && numValue <= 4094) {
+      if (isReservedVlanId(numValue)) {
+        toast({
+          title: "Reserved VLAN ID",
+          description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
       newVlanIds[index] = numValue;
     } else if (value === '') {
       delete newVlanIds[index];
+    } else if (!isNaN(numValue)) {
+      toast({
+        title: "Invalid VLAN ID",
+        description: "VLAN ID must be between 1 and 4094",
+        variant: "destructive"
+      });
+      return;
     }
     
     setVlanIds(newVlanIds);
   };
 
   const generateConfig = () => {
+    // Validate all VLAN IDs before generating config
+    const invalidVlanIds = Object.values(vlanIds).filter(id => isReservedVlanId(id));
+    if (invalidVlanIds.length > 0) {
+      toast({
+        title: "Reserved VLAN IDs",
+        description: "Configuration contains reserved VLAN IDs. Please update them before generating.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     const config = generateVOSSConfig(subnets, vlanIds, useFirstIps);
     downloadFile(config, 'extreme-voss-config.txt', 'text/plain');
     
@@ -112,7 +143,10 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
       </div>
 
       <div className="text-xs text-muted-foreground pt-2">
-        <p><strong>Note:</strong> Extreme Networks VOSS supports VLAN IDs from 1 to 4094. If no custom VLAN ID is specified, the index number will be used.</p>
+        <p className="flex items-center gap-1 text-amber-500">
+          <AlertTriangle className="size-3.5" />
+          <strong>Note:</strong> VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.
+        </p>
         <p>The configuration will include VLAN creation, interface IP addresses, and VRRP setup for high availability.</p>
       </div>
     </div>

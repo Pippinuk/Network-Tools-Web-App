@@ -12,6 +12,7 @@ import SubnetResult from '@/components/SubnetResult';
 import Navigation from '@/components/Navigation';
 import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
 import { Network, Github, Server } from 'lucide-react';
+import { useToast } from "@/components/ui/use-toast";
 
 interface SubnetInfo {
   subnet: string;
@@ -29,6 +30,7 @@ const Index = () => {
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
   const [startingVlanId, setStartingVlanId] = useState('1');
+  const { toast } = useToast();
 
   const handleCalculate = (subnet: string, divisions: number) => {
     try {
@@ -54,12 +56,46 @@ const Index = () => {
     }
   };
 
+  const isReservedVlanId = (id: number): boolean => {
+    return (id >= 4060 && id <= 4094) || id === 4048;
+  };
+
   const handleVossConfigRedirect = () => {
     // Validate VLAN ID
     const vlanId = parseInt(startingVlanId, 10);
+    
     if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
-      // If invalid, default to 1
-      setStartingVlanId('1');
+      // If invalid range, show error
+      toast({
+        title: "Invalid VLAN ID",
+        description: "VLAN ID must be between 1 and 4094.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (isReservedVlanId(vlanId)) {
+      // If reserved VLAN ID, show error
+      toast({
+        title: "Reserved VLAN ID",
+        description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if any sequential VLAN IDs will hit reserved range
+    const lastVlanId = vlanId + subnets.length - 1;
+    
+    for (let id = vlanId; id <= lastVlanId; id++) {
+      if (isReservedVlanId(id)) {
+        toast({
+          title: "Reserved VLAN ID in Range",
+          description: `VLAN IDs ${vlanId}-${lastVlanId} include reserved IDs (4048 or 4060-4094).`,
+          variant: "destructive"
+        });
+        return;
+      }
     }
     
     // Store subnet data in sessionStorage to be retrieved in the VOSS config page
