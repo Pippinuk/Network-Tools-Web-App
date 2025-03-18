@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
 import SubnetResult from '@/components/SubnetResult';
@@ -26,6 +28,7 @@ const Index = () => {
   const [originalSubnet, setOriginalSubnet] = useState('');
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
+  const [startingVlanId, setStartingVlanId] = useState('1');
 
   const handleCalculate = (subnet: string, divisions: number) => {
     try {
@@ -52,9 +55,17 @@ const Index = () => {
   };
 
   const handleVossConfigRedirect = () => {
+    // Validate VLAN ID
+    const vlanId = parseInt(startingVlanId, 10);
+    if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
+      // If invalid, default to 1
+      setStartingVlanId('1');
+    }
+    
     // Store subnet data in sessionStorage to be retrieved in the VOSS config page
     sessionStorage.setItem('subnets', JSON.stringify(subnets));
     sessionStorage.setItem('originalSubnet', originalSubnet);
+    sessionStorage.setItem('startingVlanId', startingVlanId);
     
     // Navigate to the VOSS config page
     navigate('/voss-config');
@@ -108,7 +119,31 @@ const Index = () => {
                 calculationMethod={calculationMethod}
               />
               
-              <div className="flex justify-center mt-8">
+              <div className="glass-panel p-6 space-y-4 animate-fade-in">
+                <h3 className="text-lg font-medium flex items-center gap-2">
+                  <Server className="size-5" />
+                  Create VOSS VRRP Configuration
+                </h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="startingVlanId" className="text-sm">
+                    Starting VLAN ID
+                  </Label>
+                  <Input
+                    id="startingVlanId"
+                    type="number"
+                    min={1}
+                    max={4094}
+                    value={startingVlanId}
+                    onChange={(e) => setStartingVlanId(e.target.value)}
+                    placeholder="Enter Starting VLAN ID (1-4094)"
+                    className="w-full sm:w-48"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    VLAN IDs will be assigned incrementally starting from this number
+                  </p>
+                </div>
+                
                 <Button 
                   onClick={handleVossConfigRedirect}
                   variant="outline"

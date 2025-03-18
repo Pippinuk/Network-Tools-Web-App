@@ -38,6 +38,7 @@ const VOSSConfig = () => {
   useEffect(() => {
     const storedSubnets = sessionStorage.getItem('subnets');
     const storedOriginalSubnet = sessionStorage.getItem('originalSubnet');
+    const storedStartingVlanId = sessionStorage.getItem('startingVlanId');
     
     if (storedSubnets && storedOriginalSubnet) {
       try {
@@ -48,12 +49,19 @@ const VOSSConfig = () => {
           setSubnets(parsedSubnets);
           setSubnet(storedOriginalSubnet);
           
+          // Get starting VLAN ID from session storage or default to 1
+          const startVlanId = storedStartingVlanId ? 
+            parseInt(storedStartingVlanId, 10) : 1;
+          
           // Generate default VLAN IDs
           const vlanIdsMap: Record<number, number> = {};
           parsedSubnets.forEach((_, index) => {
-            vlanIdsMap[index] = index + 1;
+            vlanIdsMap[index] = startVlanId + index;
           });
           setVlanIds(vlanIdsMap);
+          
+          // Also update the starting VLAN ID input field for reference
+          setStartingVlanId(storedStartingVlanId || '1');
           
           setHasCalculated(true);
           setActiveTab('from-subnet-slicer');
@@ -61,6 +69,7 @@ const VOSSConfig = () => {
           // Clean up sessionStorage
           sessionStorage.removeItem('subnets');
           sessionStorage.removeItem('originalSubnet');
+          sessionStorage.removeItem('startingVlanId');
           
           toast({
             title: "Subnets Imported",
