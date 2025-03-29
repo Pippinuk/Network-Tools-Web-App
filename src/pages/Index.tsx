@@ -10,9 +10,12 @@ import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
 import SubnetResult from '@/components/SubnetResult';
 import Navigation from '@/components/Navigation';
+import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
+import PANOSConfigGenerator from '@/components/PANOSConfigGenerator';
 import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
-import { Network, Github, Server } from 'lucide-react';
+import { Network, Github, Server, Shield } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SubnetInfo {
   subnet: string;
@@ -30,6 +33,7 @@ const Index = () => {
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
   const [startingVlanId, setStartingVlanId] = useState('1');
+  const [configType, setConfigType] = useState<'voss' | 'panos'>('voss');
   const { toast } = useToast();
 
   const handleCalculate = (subnet: string, divisions: number) => {
@@ -149,40 +153,64 @@ const Index = () => {
           
           {hasCalculated && (
             <>
-              {/* Moved VOSS VRRP Configuration section above the subnet results */}
+              {/* Configuration Generator Tabs */}
               <div className="glass-panel p-6 space-y-4 animate-fade-in">
-                <h3 className="text-lg font-medium flex items-center gap-2">
-                  <Server className="size-5" />
-                  Create VOSS VRRP Configuration
-                </h3>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="startingVlanId" className="text-sm">
-                    Starting VLAN ID
-                  </Label>
-                  <Input
-                    id="startingVlanId"
-                    type="number"
-                    min={1}
-                    max={4094}
-                    value={startingVlanId}
-                    onChange={(e) => setStartingVlanId(e.target.value)}
-                    placeholder="Enter Starting VLAN ID (1-4094)"
-                    className="w-full sm:w-48"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    VLAN IDs will be assigned incrementally starting from this number
-                  </p>
-                </div>
-                
-                <Button 
-                  onClick={handleVossConfigRedirect}
-                  variant="outline"
-                  className="gap-2"
+                <Tabs 
+                  value={configType} 
+                  onValueChange={(value) => setConfigType(value as 'voss' | 'panos')}
+                  className="w-full"
                 >
-                  <Server className="size-4" />
-                  Create VOSS VRRP Configuration
-                </Button>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-medium">Network Configuration Generator</h3>
+                    <TabsList className="grid grid-cols-2 w-[300px]">
+                      <TabsTrigger value="voss" className="flex items-center gap-2">
+                        <Server className="size-4" />
+                        <span>VOSS VRRP</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="panos" className="flex items-center gap-2">
+                        <Shield className="size-4" />
+                        <span>Palo Alto</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
+                  
+                  <TabsContent value="voss" className="mt-0">
+                    <div className="space-y-2">
+                      <Label htmlFor="startingVlanId" className="text-sm">
+                        Starting VLAN ID
+                      </Label>
+                      <Input
+                        id="startingVlanId"
+                        type="number"
+                        min={1}
+                        max={4094}
+                        value={startingVlanId}
+                        onChange={(e) => setStartingVlanId(e.target.value)}
+                        placeholder="Enter Starting VLAN ID (1-4094)"
+                        className="w-full sm:w-48"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        VLAN IDs will be assigned incrementally starting from this number
+                      </p>
+                    </div>
+                    
+                    <Button 
+                      onClick={handleVossConfigRedirect}
+                      variant="outline"
+                      className="gap-2 mt-4"
+                    >
+                      <Server className="size-4" />
+                      Create VOSS VRRP Configuration
+                    </Button>
+                  </TabsContent>
+                  
+                  <TabsContent value="panos" className="mt-0">
+                    <PANOSConfigGenerator 
+                      subnets={subnets} 
+                      originalSubnet={originalSubnet}
+                    />
+                  </TabsContent>
+                </Tabs>
               </div>
               
               <SubnetResult 
