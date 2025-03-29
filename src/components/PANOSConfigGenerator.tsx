@@ -23,7 +23,22 @@ interface PANOSConfigGeneratorProps {
 const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, originalSubnet }) => {
   const [useFirstIps, setUseFirstIps] = useState(true);
   const [zonePrefix, setZonePrefix] = useState('ZONE_');
+  const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
   const { toast } = useToast();
+
+  const handleVlanNameChange = (index: number, value: string) => {
+    const newVlanNames = { ...vlanNames };
+    if (value.trim() !== '') {
+      newVlanNames[index] = value.trim();
+    } else {
+      delete newVlanNames[index];
+    }
+    setVlanNames(newVlanNames);
+  };
+
+  const getVlanName = (index: number): string => {
+    return vlanNames[index] || `VLAN-${index + 1}`;
+  };
 
   const generatePANOSConfig = () => {
     try {
@@ -34,6 +49,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
       
       subnets.forEach((subnet, index) => {
         const vlanId = index + 1;
+        const vlanName = getVlanName(index);
         const zoneName = `${zonePrefix}${vlanId}`;
         const interfaceName = `ethernet1/${index + 1}`;
         const ipAddress = useFirstIps ? subnet.firstUsableHost : subnet.lastUsableHost;
@@ -49,7 +65,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         config += `  -d "element=<entry name='${zoneName}'><network><layer3><member>${interfaceName}</member></layer3></network></entry>"\n\n`;
         
         // Interface configuration
-        config += `# Configure Interface: ${interfaceName}\n`;
+        config += `# Configure Interface: ${interfaceName} (${vlanName})\n`;
         config += 'curl -X POST https://{firewall}/api/ \\\n';
         config += '  -d "type=config" \\\n';
         config += '  -d "action=set" \\\n';
@@ -58,13 +74,13 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         config += `  -d "element=<layer3><ip><entry name='${ipAddress}/${subnetMask}'></entry></ip><interface-management><https>yes</https><ping>yes</ping></interface-management></layer3>"\n\n`;
         
         // VLAN tagging if needed
-        config += `# Configure VLAN tagging for interface: ${interfaceName}\n`;
+        config += `# Configure VLAN tagging for interface: ${interfaceName} (${vlanName})\n`;
         config += 'curl -X POST https://{firewall}/api/ \\\n';
         config += '  -d "type=config" \\\n';
         config += '  -d "action=set" \\\n';
         config += '  -d "key={api_key}" \\\n';
         config += `  -d "xpath=/config/devices/entry[@name='localhost.localdomain']/network/interface/ethernet/entry[@name='ethernet1/${index + 1}']/layer3" \\\n`;
-        config += `  -d "element=<units><entry name='ethernet1/${index + 1}.${vlanId}'><tag>${vlanId}</tag><ip><entry name='${ipAddress}/${subnetMask}'/></ip></entry></units>"\n\n`;
+        config += `  -d "element=<units><entry name='ethernet1/${index + 1}.${vlanId}'><tag>${vlanId}</tag><comment>${vlanName}</comment><ip><entry name='${ipAddress}/${subnetMask}'/></ip></entry></units>"\n\n`;
       });
       
       config += '# Notes:\n';
@@ -135,6 +151,35 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         <p className="text-xs text-muted-foreground">
           Zones will be named using this prefix followed by the VLAN ID
         </p>
+      </div>
+
+      <div className="border border-border rounded-md overflow-hidden mt-4">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/50">
+              <th className="p-2 text-left font-medium">Subnet</th>
+              <th className="p-2 text-left font-medium">VLAN ID</th>
+              <th className="p-2 text-left font-medium">VLAN Name</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {subnets.map((subnet, index) => (
+              <tr key={index} className="bg-card/50">
+                <td className="p-2 font-mono">{subnet.subnet}</td>
+                <td className="p-2">{index + 1}</td>
+                <td className="p-2">
+                  <Input
+                    type="text"
+                    placeholder={`VLAN-${index + 1}`}
+                    value={vlanNames[index] || ''}
+                    onChange={(e) => handleVlanNameChange(index, e.target.value)}
+                    className="w-full h-8"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <div className="text-xs text-muted-foreground pt-2">

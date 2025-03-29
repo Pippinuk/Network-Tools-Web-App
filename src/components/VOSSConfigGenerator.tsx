@@ -23,6 +23,7 @@ interface VOSSConfigGeneratorProps {
 const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, originalSubnet }) => {
   const [useFirstIps, setUseFirstIps] = useState(true);
   const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
+  const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
   const { toast } = useToast();
 
   const isReservedVlanId = (id: number): boolean => {
@@ -58,6 +59,21 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
     setVlanIds(newVlanIds);
   };
 
+  const handleVlanNameChange = (index: number, value: string) => {
+    const newVlanNames = { ...vlanNames };
+    if (value.trim() !== '') {
+      newVlanNames[index] = value.trim();
+    } else {
+      delete newVlanNames[index];
+    }
+    setVlanNames(newVlanNames);
+  };
+
+  const getVlanName = (index: number, defaultVlanId: number): string => {
+    const actualVlanId = vlanIds[index] || defaultVlanId;
+    return vlanNames[index] || `VLAN-${actualVlanId}`;
+  };
+
   const generateConfig = () => {
     // Validate all VLAN IDs before generating config
     const invalidVlanIds = Object.values(vlanIds).filter(id => isReservedVlanId(id));
@@ -70,7 +86,7 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
       return;
     }
     
-    const config = generateVOSSConfig(subnets, vlanIds, useFirstIps);
+    const config = generateVOSSConfig(subnets, vlanIds, useFirstIps, vlanNames);
     downloadFile(config, 'extreme-voss-config.txt', 'text/plain');
     
     toast({
@@ -118,6 +134,7 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
               <th className="p-2 text-left font-medium">Subnet</th>
               <th className="p-2 text-left font-medium">Default VLAN ID</th>
               <th className="p-2 text-left font-medium">Custom VLAN ID</th>
+              <th className="p-2 text-left font-medium">VLAN Name</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -134,6 +151,15 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
                     value={vlanIds[index] || ''}
                     onChange={(e) => handleVlanIdChange(index, e.target.value)}
                     className="w-32 h-8"
+                  />
+                </td>
+                <td className="p-2">
+                  <Input
+                    type="text"
+                    placeholder={`VLAN-${vlanIds[index] || index + 1}`}
+                    value={vlanNames[index] || ''}
+                    onChange={(e) => handleVlanNameChange(index, e.target.value)}
+                    className="w-full h-8"
                   />
                 </td>
               </tr>
