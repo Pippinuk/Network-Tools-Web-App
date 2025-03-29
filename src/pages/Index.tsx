@@ -149,12 +149,7 @@ const Index = () => {
           
           {hasCalculated && (
             <>
-              <SubnetResult 
-                subnets={subnets} 
-                originalSubnet={originalSubnet}
-                calculationMethod={calculationMethod}
-              />
-              
+              {/* Moved VOSS VRRP Configuration section above the subnet results */}
               <div className="glass-panel p-6 space-y-4 animate-fade-in">
                 <h3 className="text-lg font-medium flex items-center gap-2">
                   <Server className="size-5" />
@@ -189,6 +184,12 @@ const Index = () => {
                   Create VOSS VRRP Configuration
                 </Button>
               </div>
+              
+              <SubnetResult 
+                subnets={subnets} 
+                originalSubnet={originalSubnet}
+                calculationMethod={calculationMethod}
+              />
             </>
           )}
         </div>
