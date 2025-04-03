@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { downloadFile, vlansAndSubnetsToCsv } from '@/lib/exportUtils';
-import { Download, Shield, Globe, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import { downloadFile, vlansAndSubnetsToCsv, generateVlanIds } from '@/lib/exportUtils';
+import { Download, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
 interface PANOSConfigGeneratorProps {
   subnets: Array<{
@@ -22,8 +23,30 @@ interface PANOSConfigGeneratorProps {
 const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, originalSubnet }) => {
   const [useFirstIps, setUseFirstIps] = useState(true);
   const [zonePrefix, setZonePrefix] = useState('ZONE_');
+  const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
   const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
+  const [startingVlanId, setStartingVlanId] = useState('1');
+  const [excludedVlans, setExcludedVlans] = useState('');
+  const [excludedVlansList, setExcludedVlansList] = useState<number[]>([]);
   const { toast } = useToast();
+
+  const isReservedVlanId = (id: number): boolean => {
+    return (id >= 4060 && id <= 4094) || id === 4048;
+  };
+
+  // Parse excluded VLANs when input changes
+  useEffect(() => {
+    setExcludedVlansList(parseExcludedVlans(excludedVlans));
+  }, [excludedVlans]);
+
+  // Update VLAN IDs when starting VLAN ID or exclusions change
+  useEffect(() => {
+    const startVlanId = parseInt(startingVlanId, 10);
+    if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
+      const newVlanIds = generateVlanIds(startVlanId, subnets.length, excludedVlansList);
+      setVlanIds(newVlanIds);
+    }
+  }, [startingVlanId, excludedVlansList, subnets.length]);
 
   const handleVlanNameChange = (index: number, value: string) => {
     const newVlanNames = { ...vlanNames };
@@ -36,17 +59,57 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
   };
 
   const getVlanName = (index: number): string => {
-    return vlanNames[index] || `VLAN-${index + 1}`;
+    return vlanNames[index] || `VLAN-${vlanIds[index] || index + 1}`;
+  };
+
+  const parseExcludedVlans = (input: string): number[] => {
+    if (!input.trim()) return [];
+    
+    try {
+      return input.split(',')
+        .map(part => part.trim())
+        .filter(part => part.length > 0)
+        .map(part => {
+          const num = parseInt(part, 10);
+          if (isNaN(num)) throw new Error(`Invalid VLAN ID: ${part}`);
+          return num;
+        });
+    } catch (error) {
+      console.error('Error parsing excluded VLANs:', error);
+      return [];
+    }
   };
 
   const generatePANOSConfig = () => {
     try {
+      // Validate VLAN ID
+      const vlanId = parseInt(startingVlanId, 10);
+      
+      if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
+        toast({
+          title: "Invalid VLAN ID",
+          description: "VLAN ID must be between 1 and 4094.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Check if starting VLAN ID is in excluded list
+      if (excludedVlansList.includes(vlanId)) {
+        toast({
+          title: "Starting VLAN ID Excluded",
+          description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
       let config = '# Palo Alto Networks PAN-OS REST API Configuration\n';
       config += `# Generated for subnet: ${originalSubnet}\n`;
       config += '# This is a template for API calls to configure interfaces and zones\n\n';
       
       subnets.forEach((subnet, index) => {
-        const vlanId = index + 1;
+        const vlanId = vlanIds[index] || (index + 1);
         const vlanName = getVlanName(index);
         const zoneName = `${zonePrefix}${vlanId}`;
         const interfaceName = `ethernet1/${index + 1}`;
@@ -102,12 +165,29 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
 
   const exportToCsv = () => {
     try {
-      const vlanIds: Record<number, number> = {};
-      subnets.forEach((_, index) => {
-        vlanIds[index] = index + 1;
-      });
+      // Validate VLAN ID
+      const vlanId = parseInt(startingVlanId, 10);
       
-      const csvContent = vlansAndSubnetsToCsv(subnets, vlanIds, vlanNames);
+      if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
+        toast({
+          title: "Invalid VLAN ID",
+          description: "VLAN ID must be between 1 and 4094.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Check if starting VLAN ID is in excluded list
+      if (excludedVlansList.includes(vlanId)) {
+        toast({
+          title: "Starting VLAN ID Excluded",
+          description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      const csvContent = vlansAndSubnetsToCsv(subnets, vlanIds, vlanNames, excludedVlansList);
       downloadFile(csvContent, 'panos-vlans-subnets.csv', 'text/csv');
       
       toast({
@@ -125,7 +205,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
   };
 
   return (
-    <div className="space-y-4 glass-panel p-6 animate-fade-in">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium flex items-center gap-2">
           <Shield className="size-5" />
@@ -150,6 +230,44 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
             <Download className="size-4" />
             Generate Config
           </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="space-y-2">
+          <Label htmlFor="panosStartingVlanId" className="text-sm">
+            Starting VLAN ID
+          </Label>
+          <Input
+            id="panosStartingVlanId"
+            type="number"
+            min={1}
+            max={4094}
+            value={startingVlanId}
+            onChange={(e) => setStartingVlanId(e.target.value)}
+            placeholder="Enter Starting VLAN ID (1-4094)"
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">
+            VLAN IDs will be assigned incrementally from this number
+          </p>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="panosExcludedVlans" className="text-sm flex items-center gap-1">
+            Excluded VLAN IDs
+            <AlertTriangle className="size-3 text-yellow-500" />
+          </Label>
+          <Input
+            id="panosExcludedVlans"
+            value={excludedVlans}
+            onChange={(e) => setExcludedVlans(e.target.value)}
+            placeholder="e.g. 100,200,300"
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">
+            Comma-separated list of VLAN IDs to exclude
+          </p>
         </div>
       </div>
 
@@ -184,32 +302,32 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
       </div>
 
       <div className="border border-border rounded-md overflow-hidden mt-4">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-muted/50">
-              <th className="p-2 text-left font-medium">Subnet</th>
-              <th className="p-2 text-left font-medium">VLAN ID</th>
-              <th className="p-2 text-left font-medium">VLAN Name</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="p-2 text-left font-medium">Subnet</TableHead>
+              <TableHead className="p-2 text-left font-medium">VLAN ID</TableHead>
+              <TableHead className="p-2 text-left font-medium">VLAN Name</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {subnets.map((subnet, index) => (
-              <tr key={index} className="bg-card/50">
-                <td className="p-2 font-mono">{subnet.subnet}</td>
-                <td className="p-2">{index + 1}</td>
-                <td className="p-2">
+              <TableRow key={index} className="bg-card/50">
+                <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
+                <TableCell className="p-2">{vlanIds[index] || index + 1}</TableCell>
+                <TableCell className="p-2">
                   <Input
                     type="text"
-                    placeholder={`VLAN-${index + 1}`}
+                    placeholder={`VLAN-${vlanIds[index] || index + 1}`}
                     value={vlanNames[index] || ''}
                     onChange={(e) => handleVlanNameChange(index, e.target.value)}
                     className="w-full h-8"
                   />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       <div className="text-xs text-muted-foreground pt-2">
