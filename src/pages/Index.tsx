@@ -12,8 +12,9 @@ import SubnetResult from '@/components/SubnetResult';
 import Navigation from '@/components/Navigation';
 import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
 import PANOSConfigGenerator from '@/components/PANOSConfigGenerator';
+import CSVExportGenerator from '@/components/CSVExportGenerator';
 import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
-import { Network, Github, Server, Shield, AlertTriangle } from 'lucide-react';
+import { Network, Github, Server, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -33,7 +34,7 @@ const Index = () => {
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
   const [startingVlanId, setStartingVlanId] = useState('1');
-  const [configType, setConfigType] = useState<'voss' | 'panos'>('voss');
+  const [configType, setConfigType] = useState<'voss' | 'panos' | 'csv'>('voss');
   const [excludedVlans, setExcludedVlans] = useState('');
   const { toast } = useToast();
 
@@ -190,12 +191,12 @@ const Index = () => {
               <div className="glass-panel p-6 space-y-4 animate-fade-in">
                 <Tabs 
                   value={configType} 
-                  onValueChange={(value) => setConfigType(value as 'voss' | 'panos')}
+                  onValueChange={(value) => setConfigType(value as 'voss' | 'panos' | 'csv')}
                   className="w-full"
                 >
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-medium">Network Configuration Generator</h3>
-                    <TabsList className="grid grid-cols-2 w-[300px]">
+                    <TabsList className="grid grid-cols-3 w-[400px]">
                       <TabsTrigger value="voss" className="flex items-center gap-2">
                         <Server className="size-4" />
                         <span>VOSS VRRP</span>
@@ -203,6 +204,10 @@ const Index = () => {
                       <TabsTrigger value="panos" className="flex items-center gap-2">
                         <Shield className="size-4" />
                         <span>Palo Alto</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="csv" className="flex items-center gap-2">
+                        <FileSpreadsheet className="size-4" />
+                        <span>CSV Export</span>
                       </TabsTrigger>
                     </TabsList>
                   </div>
@@ -259,6 +264,13 @@ const Index = () => {
                   <TabsContent value="panos" className="mt-0">
                     <PANOSConfigGenerator 
                       subnets={subnets} 
+                      originalSubnet={originalSubnet}
+                    />
+                  </TabsContent>
+
+                  <TabsContent value="csv" className="mt-0">
+                    <CSVExportGenerator
+                      subnets={subnets}
                       originalSubnet={originalSubnet}
                     />
                   </TabsContent>
