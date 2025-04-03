@@ -5,6 +5,16 @@ import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { 
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableCaption
+} from "@/components/ui/table";
 import { downloadFile, vlansAndSubnetsToCsv, generateVlanIds } from '@/lib/exportUtils';
 import { Download, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
