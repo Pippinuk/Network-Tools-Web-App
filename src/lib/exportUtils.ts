@@ -62,6 +62,70 @@ export const subnetsToCsv = (
 };
 
 /**
+ * Exports VLAN and subnet data to CSV format
+ */
+export const vlansAndSubnetsToCsv = (
+  subnets: Array<{
+    subnet: string;
+    networkAddress: string;
+    broadcastAddress: string;
+    firstUsableHost: string;
+    lastUsableHost: string;
+    hostsCount: number;
+  }>,
+  vlanIds: Record<number, number> = {},
+  vlanNames: Record<number, string> = {},
+  excludedVlans: number[] = []
+): string => {
+  // Create CSV header
+  const header = [
+    'Index',
+    'VLAN ID',
+    'VLAN Name',
+    'Subnet CIDR',
+    'Network Address',
+    'Subnet Mask',
+    'Broadcast Address',
+    'First Usable Host',
+    'Last Usable Host',
+    'Usable Hosts Count'
+  ].join(',');
+  
+  // Create CSV rows
+  const rows = subnets.map((subnet, index) => {
+    const cidrParts = subnet.subnet.split('/');
+    const prefix = cidrParts[1];
+    const subnetMask = prefixToSubnetMask(parseInt(prefix, 10));
+    const vlanId = vlanIds[index] || (index + 1);
+    const vlanName = vlanNames[index] || `VLAN-${vlanId}`;
+    
+    return [
+      index + 1,
+      vlanId,
+      vlanName,
+      subnet.subnet,
+      subnet.networkAddress,
+      subnetMask,
+      subnet.broadcastAddress,
+      subnet.firstUsableHost,
+      subnet.lastUsableHost,
+      subnet.hostsCount
+    ].join(',');
+  });
+  
+  // Add metadata as comment at the top
+  const metadata = [
+    `# Network Configuration Export`,
+    `# Generated: ${new Date().toISOString()}`,
+    excludedVlans.length > 0 ? `# Excluded VLAN IDs: ${excludedVlans.join(', ')}` : '',
+    ''
+  ].join('\n');
+  
+  // Combine everything
+  return metadata + header + '\n' + rows.join('\n');
+};
+
+/**
  * Converts CIDR prefix to subnet mask
  */
 export const prefixToSubnetMask = (prefix: number): string => {

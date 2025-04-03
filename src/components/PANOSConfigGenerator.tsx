@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { downloadFile } from '@/lib/exportUtils';
-import { Download, Shield, Globe, AlertTriangle } from 'lucide-react';
+import { downloadFile, vlansAndSubnetsToCsv } from '@/lib/exportUtils';
+import { Download, Shield, Globe, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
 interface PANOSConfigGeneratorProps {
   subnets: Array<{
@@ -42,7 +41,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
 
   const generatePANOSConfig = () => {
     try {
-      // Basic API call structure for Palo Alto Networks PAN-OS
       let config = '# Palo Alto Networks PAN-OS REST API Configuration\n';
       config += `# Generated for subnet: ${originalSubnet}\n`;
       config += '# This is a template for API calls to configure interfaces and zones\n\n';
@@ -55,7 +53,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         const ipAddress = useFirstIps ? subnet.firstUsableHost : subnet.lastUsableHost;
         const subnetMask = subnet.subnet.split('/')[1];
         
-        // Zone configuration
         config += `# Create Zone: ${zoneName}\n`;
         config += 'curl -X POST https://{firewall}/api/ \\\n';
         config += '  -d "type=config" \\\n';
@@ -64,7 +61,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         config += `  -d "xpath=/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='vsys1']/zone" \\\n`;
         config += `  -d "element=<entry name='${zoneName}'><network><layer3><member>${interfaceName}</member></layer3></network></entry>"\n\n`;
         
-        // Interface configuration
         config += `# Configure Interface: ${interfaceName} (${vlanName})\n`;
         config += 'curl -X POST https://{firewall}/api/ \\\n';
         config += '  -d "type=config" \\\n';
@@ -73,7 +69,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         config += `  -d "xpath=/config/devices/entry[@name='localhost.localdomain']/network/interface/ethernet/entry[@name='ethernet1/${index + 1}']" \\\n`;
         config += `  -d "element=<layer3><ip><entry name='${ipAddress}/${subnetMask}'></entry></ip><interface-management><https>yes</https><ping>yes</ping></interface-management></layer3>"\n\n`;
         
-        // VLAN tagging if needed
         config += `# Configure VLAN tagging for interface: ${interfaceName} (${vlanName})\n`;
         config += 'curl -X POST https://{firewall}/api/ \\\n';
         config += '  -d "type=config" \\\n';
@@ -105,6 +100,30 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
     }
   };
 
+  const exportToCsv = () => {
+    try {
+      const vlanIds: Record<number, number> = {};
+      subnets.forEach((_, index) => {
+        vlanIds[index] = index + 1;
+      });
+      
+      const csvContent = vlansAndSubnetsToCsv(subnets, vlanIds, vlanNames);
+      downloadFile(csvContent, 'panos-vlans-subnets.csv', 'text/csv');
+      
+      toast({
+        title: "CSV Export Complete",
+        description: "VLAN and subnet data has been exported to CSV successfully.",
+      });
+    } catch (error) {
+      console.error('CSV export error:', error);
+      toast({
+        title: "Export Error",
+        description: "Failed to export data to CSV format.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-4 glass-panel p-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -112,15 +131,26 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
           <Shield className="size-5" />
           Palo Alto PAN-OS Configuration
         </h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={generatePANOSConfig}
-          className="gap-2"
-        >
-          <Download className="size-4" />
-          Generate Config
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={exportToCsv}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="size-4" />
+            Export CSV
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={generatePANOSConfig}
+            className="gap-2"
+          >
+            <Download className="size-4" />
+            Generate Config
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center space-x-2 mb-4">

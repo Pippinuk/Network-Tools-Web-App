@@ -1,12 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { generateVOSSConfig, downloadFile } from '@/lib/exportUtils';
-import { Download, Server, Settings, AlertTriangle } from 'lucide-react';
+import { generateVOSSConfig, downloadFile, vlansAndSubnetsToCsv } from '@/lib/exportUtils';
+import { Download, Server, Settings, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 
 interface VOSSConfigGeneratorProps {
   subnets: Array<{
@@ -75,7 +74,6 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
   };
 
   const generateConfig = () => {
-    // Validate all VLAN IDs before generating config
     const invalidVlanIds = Object.values(vlanIds).filter(id => isReservedVlanId(id));
     if (invalidVlanIds.length > 0) {
       toast({
@@ -95,6 +93,25 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
     });
   };
 
+  const exportToCsv = () => {
+    try {
+      const csvContent = vlansAndSubnetsToCsv(subnets, vlanIds, vlanNames);
+      downloadFile(csvContent, 'voss-vlans-subnets.csv', 'text/csv');
+      
+      toast({
+        title: "CSV Export Complete",
+        description: "VLAN and subnet data has been exported to CSV successfully.",
+      });
+    } catch (error) {
+      console.error('CSV export error:', error);
+      toast({
+        title: "Export Error",
+        description: "Failed to export data to CSV format.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-4 glass-panel p-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -102,15 +119,26 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
           <Server className="size-5" />
           Extreme Networks VOSS Configuration
         </h3>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={generateConfig}
-          className="gap-2"
-        >
-          <Download className="size-4" />
-          Generate Config
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={exportToCsv}
+            className="gap-2"
+          >
+            <FileSpreadsheet className="size-4" />
+            Export CSV
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={generateConfig}
+            className="gap-2"
+          >
+            <Download className="size-4" />
+            Generate Config
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center space-x-2 mb-4">
