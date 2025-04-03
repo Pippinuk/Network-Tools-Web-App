@@ -243,44 +243,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div className="space-y-2">
-          <Label htmlFor="panosStartingVlanId" className="text-sm">
-            Starting VLAN ID
-          </Label>
-          <Input
-            id="panosStartingVlanId"
-            type="number"
-            min={1}
-            max={4094}
-            value={startingVlanId}
-            onChange={(e) => setStartingVlanId(e.target.value)}
-            placeholder="Enter Starting VLAN ID (1-4094)"
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground">
-            VLAN IDs will be assigned incrementally from this number
-          </p>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="panosExcludedVlans" className="text-sm flex items-center gap-1">
-            Excluded VLAN IDs
-            <AlertTriangle className="size-3 text-yellow-500" />
-          </Label>
-          <Input
-            id="panosExcludedVlans"
-            value={excludedVlans}
-            onChange={(e) => setExcludedVlans(e.target.value)}
-            placeholder="e.g. 100,200,300"
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground">
-            Comma-separated list of VLAN IDs to exclude
-          </p>
-        </div>
-      </div>
-
       <div className="flex items-center space-x-2 mb-4">
         <Switch 
           id="ip-selection-panos" 
