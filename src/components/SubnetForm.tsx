@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Button } from '@/components/ui/button';
@@ -24,27 +23,24 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
   const [maxPrefix, setMaxPrefix] = useState(30);
   const [minPrefix, setMinPrefix] = useState(0);
   const [isValid, setIsValid] = useState(false);
-  const [calculationMode, setCalculationMode] = useState<'vlans' | 'mask'>('vlans');
+  const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
   const [subnetCount, setSubnetCount] = useState<number | null>(null);
   const { toast } = useToast();
   
-  // Validate subnet whenever input changes
   useEffect(() => {
     const valid = isValidSubnet(subnet);
     setIsValid(valid);
     
-    // If valid, set the min and max prefix values
     if (valid) {
       const prefix = parseInt(subnet.split('/')[1], 10);
       setMinPrefix(prefix + 1);
-      setMaxPrefix(30); // Maximum useful subnet mask is /30 (4 addresses, 2 usable)
+      setMaxPrefix(30);
       setTargetPrefix(Math.min(Math.max(prefix + 1, targetPrefix), 30));
     }
   }, [subnet]);
 
-  // Calculate subnet count when target prefix changes
   useEffect(() => {
-    if (isValid && calculationMode === 'mask') {
+    if (isValid && calculationMethod === 'mask') {
       try {
         const prefix = parseInt(subnet.split('/')[1], 10);
         const count = calculateSubnetCount(prefix, targetPrefix);
@@ -55,7 +51,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
     } else {
       setSubnetCount(null);
     }
-  }, [subnet, targetPrefix, isValid, calculationMode]);
+  }, [subnet, targetPrefix, isValid, calculationMethod]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +65,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
       return;
     }
     
-    if (calculationMode === 'vlans') {
-      // Ensure we have a valid number of divisions
+    if (calculationMethod === 'vlans') {
       const divs = parseInt(divisionsInput, 10);
       if (isNaN(divs) || divs < 2) {
         toast({
@@ -107,7 +102,6 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
     const value = e.target.value;
     setDivisionsInput(value);
     
-    // Also update the numeric value if it's valid
     const numValue = parseInt(value, 10);
     if (!isNaN(numValue)) {
       setDivisions(numValue);
@@ -138,7 +132,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
         </p>
       </div>
 
-      <Tabs value={calculationMode} onValueChange={(value) => setCalculationMode(value as 'vlans' | 'mask')} className="w-full">
+      <Tabs value={calculationMethod} onValueChange={(value) => setCalculationMethod(value as 'vlans' | 'mask')} className="w-full">
         <TabsList className="grid grid-cols-2 w-full">
           <TabsTrigger value="vlans" className="flex items-center gap-2">
             <Users className="size-4" />
@@ -214,7 +208,7 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
         <Button 
           type="submit" 
           className="flex-1 gap-2"
-          disabled={!isValid || (calculationMode === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))}
+          disabled={!isValid || (calculationMethod === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))}
         >
           <SplitSquareVertical className="size-4" />
           <span>Slice Subnet</span>

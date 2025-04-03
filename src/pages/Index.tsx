@@ -13,7 +13,7 @@ import Navigation from '@/components/Navigation';
 import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
 import PANOSConfigGenerator from '@/components/PANOSConfigGenerator';
 import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
-import { Network, Github, Server, Shield } from 'lucide-react';
+import { Network, Github, Server, Shield, AlertTriangle } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -34,6 +34,7 @@ const Index = () => {
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
   const [startingVlanId, setStartingVlanId] = useState('1');
   const [configType, setConfigType] = useState<'voss' | 'panos'>('voss');
+  const [excludedVlans, setExcludedVlans] = useState('');
   const { toast } = useToast();
 
   const handleCalculate = (subnet: string, divisions: number) => {
@@ -64,6 +65,24 @@ const Index = () => {
     return (id >= 4060 && id <= 4094) || id === 4048;
   };
 
+  const parseExcludedVlans = (input: string): number[] => {
+    if (!input.trim()) return [];
+    
+    try {
+      return input.split(',')
+        .map(part => part.trim())
+        .filter(part => part.length > 0)
+        .map(part => {
+          const num = parseInt(part, 10);
+          if (isNaN(num)) throw new Error(`Invalid VLAN ID: ${part}`);
+          return num;
+        });
+    } catch (error) {
+      console.error('Error parsing excluded VLANs:', error);
+      return [];
+    }
+  };
+
   const handleVossConfigRedirect = () => {
     // Validate VLAN ID
     const vlanId = parseInt(startingVlanId, 10);
@@ -88,8 +107,21 @@ const Index = () => {
       return;
     }
     
+    // Parse excluded VLANs
+    const excludedVlansList = parseExcludedVlans(excludedVlans);
+    
+    // Check if starting VLAN ID is in excluded list
+    if (excludedVlansList.includes(vlanId)) {
+      toast({
+        title: "Starting VLAN ID Excluded",
+        description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
     // Check if any sequential VLAN IDs will hit reserved range
-    const lastVlanId = vlanId + subnets.length - 1;
+    const lastVlanId = vlanId + subnets.length - 1 + excludedVlansList.filter(id => id > vlanId && id <= lastVlanId).length;
     
     for (let id = vlanId; id <= lastVlanId; id++) {
       if (isReservedVlanId(id)) {
@@ -106,6 +138,7 @@ const Index = () => {
     sessionStorage.setItem('subnets', JSON.stringify(subnets));
     sessionStorage.setItem('originalSubnet', originalSubnet);
     sessionStorage.setItem('startingVlanId', startingVlanId);
+    sessionStorage.setItem('excludedVlans', excludedVlans);
     
     // Navigate to the VOSS config page
     navigate('/voss-config');
@@ -175,29 +208,48 @@ const Index = () => {
                   </div>
                   
                   <TabsContent value="voss" className="mt-0">
-                    <div className="space-y-2">
-                      <Label htmlFor="startingVlanId" className="text-sm">
-                        Starting VLAN ID
-                      </Label>
-                      <Input
-                        id="startingVlanId"
-                        type="number"
-                        min={1}
-                        max={4094}
-                        value={startingVlanId}
-                        onChange={(e) => setStartingVlanId(e.target.value)}
-                        placeholder="Enter Starting VLAN ID (1-4094)"
-                        className="w-full sm:w-48"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        VLAN IDs will be assigned incrementally starting from this number
-                      </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="startingVlanId" className="text-sm">
+                          Starting VLAN ID
+                        </Label>
+                        <Input
+                          id="startingVlanId"
+                          type="number"
+                          min={1}
+                          max={4094}
+                          value={startingVlanId}
+                          onChange={(e) => setStartingVlanId(e.target.value)}
+                          placeholder="Enter Starting VLAN ID (1-4094)"
+                          className="w-full"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          VLAN IDs will be assigned incrementally from this number
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="excludedVlans" className="text-sm flex items-center gap-1">
+                          Excluded VLAN IDs
+                          <AlertTriangle className="size-3 text-yellow-500" />
+                        </Label>
+                        <Input
+                          id="excludedVlans"
+                          value={excludedVlans}
+                          onChange={(e) => setExcludedVlans(e.target.value)}
+                          placeholder="e.g. 100,200,300"
+                          className="w-full"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Comma-separated list of VLAN IDs to exclude
+                        </p>
+                      </div>
                     </div>
                     
                     <Button 
                       onClick={handleVossConfigRedirect}
                       variant="outline"
-                      className="gap-2 mt-4"
+                      className="gap-2 mt-2"
                     >
                       <Server className="size-4" />
                       Create VOSS VRRP Configuration
