@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
@@ -85,11 +84,9 @@ const Index = () => {
   };
 
   const handleVossConfigRedirect = () => {
-    // Validate VLAN ID
     const vlanId = parseInt(startingVlanId, 10);
     
     if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
-      // If invalid range, show error
       toast({
         title: "Invalid VLAN ID",
         description: "VLAN ID must be between 1 and 4094.",
@@ -99,7 +96,6 @@ const Index = () => {
     }
     
     if (isReservedVlanId(vlanId)) {
-      // If reserved VLAN ID, show error
       toast({
         title: "Reserved VLAN ID",
         description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
@@ -108,10 +104,8 @@ const Index = () => {
       return;
     }
     
-    // Parse excluded VLANs
     const excludedVlansList = parseExcludedVlans(excludedVlans);
     
-    // Check if starting VLAN ID is in excluded list
     if (excludedVlansList.includes(vlanId)) {
       toast({
         title: "Starting VLAN ID Excluded",
@@ -121,7 +115,6 @@ const Index = () => {
       return;
     }
     
-    // Check if any sequential VLAN IDs will hit reserved range
     const lastVlanId = vlanId + subnets.length - 1 + excludedVlansList.filter(id => id > vlanId && id <= lastVlanId).length;
     
     for (let id = vlanId; id <= lastVlanId; id++) {
@@ -135,14 +128,28 @@ const Index = () => {
       }
     }
     
-    // Store subnet data in sessionStorage to be retrieved in the VOSS config page
     sessionStorage.setItem('subnets', JSON.stringify(subnets));
     sessionStorage.setItem('originalSubnet', originalSubnet);
     sessionStorage.setItem('startingVlanId', startingVlanId);
     sessionStorage.setItem('excludedVlans', excludedVlans);
     
-    // Navigate to the VOSS config page
     navigate('/voss-config');
+  };
+
+  const handleStartingVlanIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setStartingVlanId(newValue);
+    sessionStorage.setItem('startingVlanId', newValue);
+    
+    window.dispatchEvent(new Event('sessionStorageChange'));
+  };
+
+  const handleExcludedVlansChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    setExcludedVlans(newValue);
+    sessionStorage.setItem('excludedVlans', newValue);
+    
+    window.dispatchEvent(new Event('sessionStorageChange'));
   };
 
   return (
@@ -187,7 +194,6 @@ const Index = () => {
           
           {hasCalculated && (
             <>
-              {/* Configuration Generator Tabs */}
               <div className="glass-panel p-6 space-y-4 animate-fade-in">
                 <Tabs 
                   value={configType} 
@@ -223,7 +229,7 @@ const Index = () => {
                         min={1}
                         max={4094}
                         value={startingVlanId}
-                        onChange={(e) => setStartingVlanId(e.target.value)}
+                        onChange={handleStartingVlanIdChange}
                         placeholder="Enter Starting VLAN ID (1-4094)"
                         className="w-full"
                       />
@@ -240,7 +246,7 @@ const Index = () => {
                       <Input
                         id="excludedVlans"
                         value={excludedVlans}
-                        onChange={(e) => setExcludedVlans(e.target.value)}
+                        onChange={handleExcludedVlansChange}
                         placeholder="e.g. 100,200,300"
                         className="w-full"
                       />

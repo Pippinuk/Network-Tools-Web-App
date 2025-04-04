@@ -6,7 +6,6 @@ import { generateComprehensiveCsv, downloadFile, generateVlanIds } from '@/lib/e
 import { Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface CSVExportGeneratorProps {
   subnets: Array<{
@@ -23,28 +22,49 @@ interface CSVExportGeneratorProps {
 const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, originalSubnet }) => {
   const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
   const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
-  const [startingVlanId, setStartingVlanId] = useState('1');
-  const [excludedVlans, setExcludedVlans] = useState('');
-  const [excludedVlansList, setExcludedVlansList] = useState<number[]>([]);
   const { toast } = useToast();
+
+  // Get startingVlanId and excludedVlans from sessionStorage
+  const [excludedVlansList, setExcludedVlansList] = useState<number[]>([]);
+
+  useEffect(() => {
+    // Get values from sessionStorage
+    const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+    const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+    
+    // Parse excluded VLANs
+    const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
+    setExcludedVlansList(parsedExcluded);
+    
+    // Generate VLAN IDs based on starting ID and exclusions
+    const startVlanId = parseInt(storedStartingVlanId, 10);
+    if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
+      const newVlanIds = generateVlanIds(startVlanId, subnets.length, parsedExcluded);
+      setVlanIds(newVlanIds);
+    }
+  }, [subnets.length]);
 
   const isReservedVlanId = (id: number): boolean => {
     return (id >= 4060 && id <= 4094) || id === 4048;
   };
 
-  // Parse excluded VLANs when input changes
-  useEffect(() => {
-    setExcludedVlansList(parseExcludedVlans(excludedVlans));
-  }, [excludedVlans]);
-
-  // Update VLAN IDs when starting VLAN ID or exclusions change
-  useEffect(() => {
-    const startVlanId = parseInt(startingVlanId, 10);
-    if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
-      const newVlanIds = generateVlanIds(startVlanId, subnets.length, excludedVlansList);
-      setVlanIds(newVlanIds);
+  const parseExcludedVlans = (input: string): number[] => {
+    if (!input.trim()) return [];
+    
+    try {
+      return input.split(',')
+        .map(part => part.trim())
+        .filter(part => part.length > 0)
+        .map(part => {
+          const num = parseInt(part, 10);
+          if (isNaN(num)) throw new Error(`Invalid VLAN ID: ${part}`);
+          return num;
+        });
+    } catch (error) {
+      console.error('Error parsing excluded VLANs:', error);
+      return [];
     }
-  }, [startingVlanId, excludedVlansList, subnets.length]);
+  };
 
   const handleVlanIdChange = (index: number, value: string) => {
     const newVlanIds = { ...vlanIds };
@@ -78,28 +98,13 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
     setVlanNames(newVlanNames);
   };
 
-  const parseExcludedVlans = (input: string): number[] => {
-    if (!input.trim()) return [];
-    
-    try {
-      return input.split(',')
-        .map(part => part.trim())
-        .filter(part => part.length > 0)
-        .map(part => {
-          const num = parseInt(part, 10);
-          if (isNaN(num)) throw new Error(`Invalid VLAN ID: ${part}`);
-          return num;
-        });
-    } catch (error) {
-      console.error('Error parsing excluded VLANs:', error);
-      return [];
-    }
-  };
-
   const exportToCsv = () => {
     try {
-      // Validate VLAN ID
-      const vlanId = parseInt(startingVlanId, 10);
+      // Get latest values from sessionStorage
+      const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const vlanId = parseInt(storedStartingVlanId, 10);
+      const parsedExcludedVlansList = parseExcludedVlans(storedExcludedVlans);
       
       if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
         toast({
@@ -120,7 +125,7 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
       }
       
       // Check if starting VLAN ID is in excluded list
-      if (excludedVlansList.includes(vlanId)) {
+      if (parsedExcludedVlansList.includes(vlanId)) {
         toast({
           title: "Starting VLAN ID Excluded",
           description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
@@ -129,7 +134,7 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
         return;
       }
       
-      const csvContent = generateComprehensiveCsv(subnets, vlanIds, vlanNames, excludedVlansList);
+      const csvContent = generateComprehensiveCsv(subnets, vlanIds, vlanNames, parsedExcludedVlansList);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       downloadFile(csvContent, `vlans-subnets-export-${timestamp}.csv`, 'text/csv');
       
@@ -146,6 +151,32 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
       });
     }
   };
+
+  // Listen for changes in sessionStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
+      setExcludedVlansList(parsedExcluded);
+      
+      const startVlanId = parseInt(storedStartingVlanId, 10);
+      if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
+        const newVlanIds = generateVlanIds(startVlanId, subnets.length, parsedExcluded);
+        setVlanIds(newVlanIds);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Custom event for local changes
+    window.addEventListener('sessionStorageChange', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sessionStorageChange', handleStorageChange);
+    };
+  }, [subnets.length]);
 
   return (
     <div className="space-y-4">
@@ -167,44 +198,6 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
         Customize VLAN IDs and names before exporting subnet information to CSV format. The export will include all subnet details including network addresses, subnet masks, broadcast addresses, and usable host ranges.
       </p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div className="space-y-2">
-          <Label htmlFor="csvStartingVlanId" className="text-sm">
-            Starting VLAN ID
-          </Label>
-          <Input
-            id="csvStartingVlanId"
-            type="number"
-            min={1}
-            max={4094}
-            value={startingVlanId}
-            onChange={(e) => setStartingVlanId(e.target.value)}
-            placeholder="Enter Starting VLAN ID (1-4094)"
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground">
-            VLAN IDs will be assigned incrementally from this number
-          </p>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="csvExcludedVlans" className="text-sm flex items-center gap-1">
-            Excluded VLAN IDs
-            <AlertTriangle className="size-3 text-yellow-500" />
-          </Label>
-          <Input
-            id="csvExcludedVlans"
-            value={excludedVlans}
-            onChange={(e) => setExcludedVlans(e.target.value)}
-            placeholder="e.g. 100,200,300"
-            className="w-full"
-          />
-          <p className="text-xs text-muted-foreground">
-            Comma-separated list of VLAN IDs to exclude
-          </p>
-        </div>
-      </div>
-
       <div className="border border-border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
@@ -216,32 +209,35 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
             </TableRow>
           </TableHeader>
           <TableBody>
-            {subnets.map((subnet, index) => (
-              <TableRow key={index}>
-                <TableCell className="font-mono">{subnet.subnet}</TableCell>
-                <TableCell className="font-mono">{subnet.networkAddress}</TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={4094}
-                    placeholder={`${vlanIds[index] || index + 1}`}
-                    value={vlanIds[index] || ''}
-                    onChange={(e) => handleVlanIdChange(index, e.target.value)}
-                    className="w-24 h-8"
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="text"
-                    placeholder={`VLAN-${vlanIds[index] || index + 1}`}
-                    value={vlanNames[index] || ''}
-                    onChange={(e) => handleVlanNameChange(index, e.target.value)}
-                    className="w-full h-8"
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+            {subnets.map((subnet, index) => {
+              const currentVlanId = vlanIds[index] || index + 1;
+              return (
+                <TableRow key={index}>
+                  <TableCell className="font-mono">{subnet.subnet}</TableCell>
+                  <TableCell className="font-mono">{subnet.networkAddress}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={4094}
+                      placeholder={`${currentVlanId}`}
+                      value={vlanIds[index] || ''}
+                      onChange={(e) => handleVlanIdChange(index, e.target.value)}
+                      className="w-24 h-8"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input
+                      type="text"
+                      placeholder={`VLAN-${currentVlanId}`}
+                      value={vlanNames[index] || ''}
+                      onChange={(e) => handleVlanNameChange(index, e.target.value)}
+                      className="w-full h-8"
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
