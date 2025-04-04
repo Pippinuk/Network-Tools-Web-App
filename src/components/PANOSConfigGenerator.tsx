@@ -1,19 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { 
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell
-} from "@/components/ui/table";
 import { downloadFile, vlansAndSubnetsToCsv, generateVlanIds } from '@/lib/exportUtils';
 import { Download, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import SubnetResultTable from './SubnetResultTable';
 
 interface PANOSConfigGeneratorProps {
   subnets: Array<{
@@ -302,37 +296,13 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         </p>
       </div>
 
-      <div className="border border-border rounded-md overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="p-2 text-left font-medium">Subnet</TableHead>
-              <TableHead className="p-2 text-left font-medium">VLAN ID</TableHead>
-              <TableHead className="p-2 text-left font-medium">VLAN Name</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {subnets.map((subnet, index) => {
-              const currentVlanId = vlanIds[index] || index + 1;
-              return (
-                <TableRow key={index} className="bg-card/50">
-                  <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
-                  <TableCell className="p-2">{currentVlanId}</TableCell>
-                  <TableCell className="p-2">
-                    <Input
-                      type="text"
-                      placeholder={`VLAN-${currentVlanId}`}
-                      value={vlanNames[index] || ''}
-                      onChange={(e) => handleVlanNameChange(index, e.target.value)}
-                      className="w-full h-8"
-                    />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <SubnetResultTable 
+        subnets={subnets}
+        vlanIds={vlanIds}
+        vlanNames={vlanNames}
+        onVlanNameChange={handleVlanNameChange}
+        className="mt-4"
+      />
 
       <div className="text-xs text-muted-foreground pt-2">
         <p className="flex items-center gap-1 text-amber-500">
