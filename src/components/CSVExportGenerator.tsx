@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { generateComprehensiveCsv, downloadFile, generateVlanIds } from '@/lib/exportUtils';
 import { Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 
 interface CSVExportGeneratorProps {
@@ -64,28 +71,6 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
       console.error('Error parsing excluded VLANs:', error);
       return [];
     }
-  };
-
-  const handleVlanIdChange = (index: number, value: string) => {
-    const newVlanIds = { ...vlanIds };
-    const numValue = parseInt(value, 10);
-    
-    if (!isNaN(numValue) && numValue > 0 && numValue <= 4094) {
-      if (isReservedVlanId(numValue)) {
-        toast({
-          title: "Reserved VLAN ID",
-          description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      newVlanIds[index] = numValue;
-    } else if (value === '') {
-      delete newVlanIds[index];
-    }
-    
-    setVlanIds(newVlanIds);
   };
 
   const handleVlanNameChange = (index: number, value: string) => {
@@ -168,8 +153,6 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
     };
     
     window.addEventListener('storage', handleStorageChange);
-    
-    // Custom event for local changes
     window.addEventListener('sessionStorageChange', handleStorageChange);
     
     return () => {
@@ -195,38 +178,26 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
       </div>
 
       <p className="text-sm text-muted-foreground mb-4">
-        Customize VLAN IDs and names before exporting subnet information to CSV format. The export will include all subnet details including network addresses, subnet masks, broadcast addresses, and usable host ranges.
+        Customize VLAN names before exporting subnet information to CSV format. The export will include all subnet details including network addresses, subnet masks, broadcast addresses, and usable host ranges.
       </p>
 
       <div className="border border-border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
-              <TableHead className="w-[180px]">Subnet CIDR</TableHead>
-              <TableHead>Network Address</TableHead>
-              <TableHead>VLAN ID</TableHead>
-              <TableHead>VLAN Name</TableHead>
+              <TableHead className="p-2 text-left font-medium">Subnet</TableHead>
+              <TableHead className="p-2 text-left font-medium">VLAN ID</TableHead>
+              <TableHead className="p-2 text-left font-medium">VLAN Name</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {subnets.map((subnet, index) => {
               const currentVlanId = vlanIds[index] || index + 1;
               return (
-                <TableRow key={index}>
-                  <TableCell className="font-mono">{subnet.subnet}</TableCell>
-                  <TableCell className="font-mono">{subnet.networkAddress}</TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      min={1}
-                      max={4094}
-                      placeholder={`${currentVlanId}`}
-                      value={vlanIds[index] || ''}
-                      onChange={(e) => handleVlanIdChange(index, e.target.value)}
-                      className="w-24 h-8"
-                    />
-                  </TableCell>
-                  <TableCell>
+                <TableRow key={index} className="bg-card/50">
+                  <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
+                  <TableCell className="p-2">{currentVlanId}</TableCell>
+                  <TableCell className="p-2">
                     <Input
                       type="text"
                       placeholder={`VLAN-${currentVlanId}`}

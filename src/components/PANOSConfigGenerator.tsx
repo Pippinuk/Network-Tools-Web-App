@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,11 +8,9 @@ import {
   Table,
   TableHeader,
   TableBody,
-  TableFooter,
   TableHead,
   TableRow,
-  TableCell,
-  TableCaption
+  TableCell
 } from "@/components/ui/table";
 import { downloadFile, vlansAndSubnetsToCsv, generateVlanIds } from '@/lib/exportUtils';
 import { Download, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
@@ -35,8 +32,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
   const [zonePrefix, setZonePrefix] = useState('ZONE_');
   const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
   const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
-  const [startingVlanId, setStartingVlanId] = useState('1');
-  const [excludedVlans, setExcludedVlans] = useState('');
   const [excludedVlansList, setExcludedVlansList] = useState<number[]>([]);
   const { toast } = useToast();
 
@@ -44,33 +39,47 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
     return (id >= 4060 && id <= 4094) || id === 4048;
   };
 
-  // Parse excluded VLANs when input changes
+  // Load VLAN IDs from sessionStorage
   useEffect(() => {
-    setExcludedVlansList(parseExcludedVlans(excludedVlans));
-  }, [excludedVlans]);
-
-  // Update VLAN IDs when starting VLAN ID or exclusions change
-  useEffect(() => {
-    const startVlanId = parseInt(startingVlanId, 10);
+    // Get values from sessionStorage
+    const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+    const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+    
+    // Parse excluded VLANs
+    const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
+    setExcludedVlansList(parsedExcluded);
+    
+    // Generate VLAN IDs based on starting ID and exclusions
+    const startVlanId = parseInt(storedStartingVlanId, 10);
     if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
-      const newVlanIds = generateVlanIds(startVlanId, subnets.length, excludedVlansList);
+      const newVlanIds = generateVlanIds(startVlanId, subnets.length, parsedExcluded);
       setVlanIds(newVlanIds);
     }
-  }, [startingVlanId, excludedVlansList, subnets.length]);
+  }, [subnets.length]);
 
-  const handleVlanNameChange = (index: number, value: string) => {
-    const newVlanNames = { ...vlanNames };
-    if (value.trim() !== '') {
-      newVlanNames[index] = value.trim();
-    } else {
-      delete newVlanNames[index];
-    }
-    setVlanNames(newVlanNames);
-  };
-
-  const getVlanName = (index: number): string => {
-    return vlanNames[index] || `VLAN-${vlanIds[index] || index + 1}`;
-  };
+  // Listen for changes in sessionStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
+      setExcludedVlansList(parsedExcluded);
+      
+      const startVlanId = parseInt(storedStartingVlanId, 10);
+      if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
+        const newVlanIds = generateVlanIds(startVlanId, subnets.length, parsedExcluded);
+        setVlanIds(newVlanIds);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sessionStorageChange', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sessionStorageChange', handleStorageChange);
+    };
+  }, [subnets.length]);
 
   const parseExcludedVlans = (input: string): number[] => {
     if (!input.trim()) return [];
@@ -90,10 +99,27 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
     }
   };
 
+  const handleVlanNameChange = (index: number, value: string) => {
+    const newVlanNames = { ...vlanNames };
+    if (value.trim() !== '') {
+      newVlanNames[index] = value.trim();
+    } else {
+      delete newVlanNames[index];
+    }
+    setVlanNames(newVlanNames);
+  };
+
+  const getVlanName = (index: number): string => {
+    return vlanNames[index] || `VLAN-${vlanIds[index] || index + 1}`;
+  };
+
   const generatePANOSConfig = () => {
     try {
-      // Validate VLAN ID
-      const vlanId = parseInt(startingVlanId, 10);
+      // Get latest values from sessionStorage
+      const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const vlanId = parseInt(storedStartingVlanId, 10);
+      const parsedExcludedVlansList = parseExcludedVlans(storedExcludedVlans);
       
       if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
         toast({
@@ -105,7 +131,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
       }
       
       // Check if starting VLAN ID is in excluded list
-      if (excludedVlansList.includes(vlanId)) {
+      if (parsedExcludedVlansList.includes(vlanId)) {
         toast({
           title: "Starting VLAN ID Excluded",
           description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
@@ -175,8 +201,11 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
 
   const exportToCsv = () => {
     try {
-      // Validate VLAN ID
-      const vlanId = parseInt(startingVlanId, 10);
+      // Get latest values from sessionStorage
+      const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const vlanId = parseInt(storedStartingVlanId, 10);
+      const parsedExcludedVlansList = parseExcludedVlans(storedExcludedVlans);
       
       if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
         toast({
@@ -188,7 +217,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
       }
       
       // Check if starting VLAN ID is in excluded list
-      if (excludedVlansList.includes(vlanId)) {
+      if (parsedExcludedVlansList.includes(vlanId)) {
         toast({
           title: "Starting VLAN ID Excluded",
           description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
@@ -197,7 +226,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         return;
       }
       
-      const csvContent = vlansAndSubnetsToCsv(subnets, vlanIds, vlanNames, excludedVlansList);
+      const csvContent = vlansAndSubnetsToCsv(subnets, vlanIds, vlanNames, parsedExcludedVlansList);
       downloadFile(csvContent, 'panos-vlans-subnets.csv', 'text/csv');
       
       toast({
@@ -273,7 +302,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
         </p>
       </div>
 
-      <div className="border border-border rounded-md overflow-hidden mt-4">
+      <div className="border border-border rounded-md overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
@@ -283,21 +312,24 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
             </TableRow>
           </TableHeader>
           <TableBody>
-            {subnets.map((subnet, index) => (
-              <TableRow key={index} className="bg-card/50">
-                <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
-                <TableCell className="p-2">{vlanIds[index] || index + 1}</TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    type="text"
-                    placeholder={`VLAN-${vlanIds[index] || index + 1}`}
-                    value={vlanNames[index] || ''}
-                    onChange={(e) => handleVlanNameChange(index, e.target.value)}
-                    className="w-full h-8"
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+            {subnets.map((subnet, index) => {
+              const currentVlanId = vlanIds[index] || index + 1;
+              return (
+                <TableRow key={index} className="bg-card/50">
+                  <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
+                  <TableCell className="p-2">{currentVlanId}</TableCell>
+                  <TableCell className="p-2">
+                    <Input
+                      type="text"
+                      placeholder={`VLAN-${currentVlanId}`}
+                      value={vlanNames[index] || ''}
+                      onChange={(e) => handleVlanNameChange(index, e.target.value)}
+                      className="w-full h-8"
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>

@@ -7,7 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { generateVOSSConfig, downloadFile, vlansAndSubnetsToCsv, generateVlanIds } from '@/lib/exportUtils';
 import { Download, Server, AlertTriangle, FileSpreadsheet } from 'lucide-react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
 
 interface VOSSConfigGeneratorProps {
   subnets: Array<{
@@ -28,17 +35,12 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
   const { toast } = useToast();
 
   // Get startingVlanId and excludedVlans from parent component via sessionStorage
-  const [startingVlanId, setStartingVlanId] = useState('');
-  const [excludedVlans, setExcludedVlans] = useState('');
   const [excludedVlansList, setExcludedVlansList] = useState<number[]>([]);
 
   useEffect(() => {
     // Get values from sessionStorage
     const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
     const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
-    
-    setStartingVlanId(storedStartingVlanId);
-    setExcludedVlans(storedExcludedVlans);
     
     // Parse excluded VLANs
     const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
@@ -72,35 +74,6 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
       console.error('Error parsing excluded VLANs:', error);
       return [];
     }
-  };
-
-  const handleVlanIdChange = (index: number, value: string) => {
-    const newVlanIds = { ...vlanIds };
-    const numValue = parseInt(value, 10);
-    
-    if (!isNaN(numValue) && numValue > 0 && numValue <= 4094) {
-      if (isReservedVlanId(numValue)) {
-        toast({
-          title: "Reserved VLAN ID",
-          description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      newVlanIds[index] = numValue;
-    } else if (value === '') {
-      delete newVlanIds[index];
-    } else if (!isNaN(numValue)) {
-      toast({
-        title: "Invalid VLAN ID",
-        description: "VLAN ID must be between 1 and 4094",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setVlanIds(newVlanIds);
   };
 
   const handleVlanNameChange = (index: number, value: string) => {
@@ -157,6 +130,30 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
     }
   };
 
+  // Listen for changes in sessionStorage
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
+      setExcludedVlansList(parsedExcluded);
+      
+      const startVlanId = parseInt(storedStartingVlanId, 10);
+      if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
+        const newVlanIds = generateVlanIds(startVlanId, subnets.length, parsedExcluded);
+        setVlanIds(newVlanIds);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('sessionStorageChange', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('sessionStorageChange', handleStorageChange);
+    };
+  }, [subnets.length]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -210,31 +207,24 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
             </TableRow>
           </TableHeader>
           <TableBody>
-            {subnets.map((subnet, index) => (
-              <TableRow key={index} className="bg-card/50">
-                <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={4094}
-                    placeholder={`${vlanIds[index] || index + 1}`}
-                    value={vlanIds[index] || ''}
-                    onChange={(e) => handleVlanIdChange(index, e.target.value)}
-                    className="w-32 h-8"
-                  />
-                </TableCell>
-                <TableCell className="p-2">
-                  <Input
-                    type="text"
-                    placeholder={`VLAN-${vlanIds[index] || index + 1}`}
-                    value={vlanNames[index] || ''}
-                    onChange={(e) => handleVlanNameChange(index, e.target.value)}
-                    className="w-full h-8"
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
+            {subnets.map((subnet, index) => {
+              const currentVlanId = vlanIds[index] || index + 1;
+              return (
+                <TableRow key={index} className="bg-card/50">
+                  <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
+                  <TableCell className="p-2">{currentVlanId}</TableCell>
+                  <TableCell className="p-2">
+                    <Input
+                      type="text"
+                      placeholder={`VLAN-${currentVlanId}`}
+                      value={vlanNames[index] || ''}
+                      onChange={(e) => handleVlanNameChange(index, e.target.value)}
+                      className="w-full h-8"
+                    />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </div>
@@ -245,11 +235,6 @@ const VOSSConfigGenerator: React.FC<VOSSConfigGeneratorProps> = ({ subnets, orig
           <strong>Note:</strong> VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.
         </p>
         <p>The configuration will include VLAN creation, interface IP addresses, and VRRP setup for high availability.</p>
-        {excludedVlans && (
-          <p className="mt-1">
-            <strong>Excluded VLAN IDs:</strong> {excludedVlans}
-          </p>
-        )}
       </div>
     </div>
   );
