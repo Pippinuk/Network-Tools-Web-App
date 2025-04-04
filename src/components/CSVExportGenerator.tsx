@@ -4,15 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { generateComprehensiveCsv, downloadFile, generateVlanIds } from '@/lib/exportUtils';
 import { Download, FileSpreadsheet, AlertTriangle } from 'lucide-react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
-import { Input } from "@/components/ui/input";
+import SubnetResultTable from './SubnetResultTable';
 
 interface CSVExportGeneratorProps {
   subnets: Array<{
@@ -181,37 +173,12 @@ const CSVExportGenerator: React.FC<CSVExportGeneratorProps> = ({ subnets, origin
         Customize VLAN names before exporting subnet information to CSV format. The export will include all subnet details including network addresses, subnet masks, broadcast addresses, and usable host ranges.
       </p>
 
-      <div className="border border-border rounded-md overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="p-2 text-left font-medium">Subnet</TableHead>
-              <TableHead className="p-2 text-left font-medium">VLAN ID</TableHead>
-              <TableHead className="p-2 text-left font-medium">VLAN Name</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {subnets.map((subnet, index) => {
-              const currentVlanId = vlanIds[index] || index + 1;
-              return (
-                <TableRow key={index} className="bg-card/50">
-                  <TableCell className="p-2 font-mono">{subnet.subnet}</TableCell>
-                  <TableCell className="p-2">{currentVlanId}</TableCell>
-                  <TableCell className="p-2">
-                    <Input
-                      type="text"
-                      placeholder={`VLAN-${currentVlanId}`}
-                      value={vlanNames[index] || ''}
-                      onChange={(e) => handleVlanNameChange(index, e.target.value)}
-                      className="w-full h-8"
-                    />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <SubnetResultTable 
+        subnets={subnets} 
+        vlanIds={vlanIds} 
+        vlanNames={vlanNames}
+        onVlanNameChange={handleVlanNameChange}
+      />
 
       <div className="text-xs text-muted-foreground pt-2">
         <p className="flex items-center gap-1 text-amber-500">

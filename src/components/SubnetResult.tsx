@@ -1,18 +1,10 @@
 
 import React, { useState } from 'react';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { subnetsToCsv, downloadFile, prefixToSubnetMask } from '@/lib/exportUtils';
-import { Check, Copy, ChevronsUpDown, FileDown, Share2 } from 'lucide-react';
+import { subnetsToCsv, downloadFile, prefixToSubnetMask, generateVlanIds } from '@/lib/exportUtils';
+import { FileDown, Share2, ChevronsUpDown } from 'lucide-react';
 import { 
   Collapsible,
   CollapsibleContent,
@@ -20,6 +12,13 @@ import {
 } from "@/components/ui/collapsible";
 import { formatNumber } from '@/lib/subnetUtils';
 import { useToast } from '@/components/ui/use-toast';
+import SubnetResultTable from './SubnetResultTable';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableRow 
+} from '@/components/ui/table';
 
 interface SubnetResultProps {
   subnets: Array<{
@@ -43,7 +42,61 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
 }) => {
   const [expandedSubnet, setExpandedSubnet] = useState<string | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
+  const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
+  const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
   const { toast } = useToast();
+
+  // Initialize VLAN IDs based on session storage
+  React.useEffect(() => {
+    const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+    const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+    const startVlanId = parseInt(storedStartingVlanId, 10);
+    
+    // Parse excluded VLANs
+    const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
+    
+    if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
+      const newVlanIds = generateVlanIds(startVlanId, subnets.length, parsedExcluded);
+      setVlanIds(newVlanIds);
+    }
+    
+    // Listen for changes
+    const handleStorageChange = () => {
+      const updatedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const updatedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
+      const updatedStartVlanId = parseInt(updatedStartingVlanId, 10);
+      const updatedParsedExcluded = parseExcludedVlans(updatedExcludedVlans);
+      
+      if (!isNaN(updatedStartVlanId) && updatedStartVlanId > 0 && updatedStartVlanId <= 4094) {
+        const updatedVlanIds = generateVlanIds(updatedStartVlanId, subnets.length, updatedParsedExcluded);
+        setVlanIds(updatedVlanIds);
+      }
+    };
+    
+    window.addEventListener('sessionStorageChange', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('sessionStorageChange', handleStorageChange);
+    };
+  }, [subnets.length]);
+
+  const parseExcludedVlans = (input: string): number[] => {
+    if (!input.trim()) return [];
+    
+    try {
+      return input.split(',')
+        .map(part => part.trim())
+        .filter(part => part.length > 0)
+        .map(part => {
+          const num = parseInt(part, 10);
+          if (isNaN(num)) throw new Error(`Invalid VLAN ID: ${part}`);
+          return num;
+        });
+    } catch (error) {
+      console.error('Error parsing excluded VLANs:', error);
+      return [];
+    }
+  };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -108,7 +161,15 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
         <Separator className="my-4" />
       </div>
 
-      <div className="space-y-4">
+      {/* Table View */}
+      <SubnetResultTable 
+        subnets={subnets}
+        vlanIds={vlanIds}
+        vlanNames={vlanNames}
+      />
+
+      <div className="space-y-4 mt-6">
+        <h4 className="text-sm font-medium">Detailed Subnet Information</h4>
         {subnets.map((subnet, index) => (
           <Collapsible 
             key={subnet.subnet} 
@@ -120,7 +181,7 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded-full">
-                    {calculationMethod === 'vlans' ? `VLAN ${index + 1}` : `Subnet ${index + 1}`}
+                    {calculationMethod === 'vlans' ? `VLAN ${vlanIds[index] || index + 1}` : `Subnet ${index + 1}`}
                   </span>
                   <h4 className="font-medium">{subnet.subnet}</h4>
                 </div>
@@ -129,29 +190,11 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
                 </p>
               </div>
               
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy(subnet.subnet);
-                  }}
-                  className="size-8"
-                >
-                  {copiedText === subnet.subnet ? (
-                    <Check className="size-4 text-green-500" />
-                  ) : (
-                    <Copy className="size-4" />
-                  )}
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="icon" className="size-8">
+                  <ChevronsUpDown className="size-4" />
                 </Button>
-                
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-8">
-                    <ChevronsUpDown className="size-4" />
-                  </Button>
-                </CollapsibleTrigger>
-              </div>
+              </CollapsibleTrigger>
             </div>
             
             <CollapsibleContent>
@@ -161,96 +204,26 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
                     <TableRow>
                       <TableCell className="font-medium w-1/3">Network Address</TableCell>
                       <TableCell className="font-mono">{subnet.networkAddress}</TableCell>
-                      <TableCell className="w-10">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleCopy(subnet.networkAddress)}
-                          className="size-7"
-                        >
-                          {copiedText === subnet.networkAddress ? (
-                            <Check className="size-3 text-green-500" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                        </Button>
-                      </TableCell>
                     </TableRow>
                     
                     <TableRow>
                       <TableCell className="font-medium">Subnet Mask</TableCell>
                       <TableCell className="font-mono">{prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10))}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleCopy(prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10)))}
-                          className="size-7"
-                        >
-                          {copiedText === prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10)) ? (
-                            <Check className="size-3 text-green-500" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                        </Button>
-                      </TableCell>
                     </TableRow>
                     
                     <TableRow>
                       <TableCell className="font-medium">Broadcast Address</TableCell>
                       <TableCell className="font-mono">{subnet.broadcastAddress}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleCopy(subnet.broadcastAddress)}
-                          className="size-7"
-                        >
-                          {copiedText === subnet.broadcastAddress ? (
-                            <Check className="size-3 text-green-500" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                        </Button>
-                      </TableCell>
                     </TableRow>
                     
                     <TableRow>
                       <TableCell className="font-medium">First Usable Host</TableCell>
                       <TableCell className="font-mono">{subnet.firstUsableHost}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleCopy(subnet.firstUsableHost)}
-                          className="size-7"
-                        >
-                          {copiedText === subnet.firstUsableHost ? (
-                            <Check className="size-3 text-green-500" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                        </Button>
-                      </TableCell>
                     </TableRow>
                     
                     <TableRow>
                       <TableCell className="font-medium">Last Usable Host</TableCell>
                       <TableCell className="font-mono">{subnet.lastUsableHost}</TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleCopy(subnet.lastUsableHost)}
-                          className="size-7"
-                        >
-                          {copiedText === subnet.lastUsableHost ? (
-                            <Check className="size-3 text-green-500" />
-                          ) : (
-                            <Copy className="size-3" />
-                          )}
-                        </Button>
-                      </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
