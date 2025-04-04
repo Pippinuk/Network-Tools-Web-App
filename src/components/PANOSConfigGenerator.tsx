@@ -103,10 +103,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
     setVlanNames(newVlanNames);
   };
 
-  const getVlanName = (index: number): string => {
-    return vlanNames[index] || `VLAN-${vlanIds[index] || index + 1}`;
-  };
-
   const generatePANOSConfig = () => {
     try {
       // Get latest values from sessionStorage
@@ -140,7 +136,7 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
       
       subnets.forEach((subnet, index) => {
         const vlanId = vlanIds[index] || (index + 1);
-        const vlanName = getVlanName(index);
+        const vlanName = vlanNames[index] || `VLAN-${vlanId}`;
         const zoneName = `${zonePrefix}${vlanId}`;
         const interfaceName = `ethernet1/${index + 1}`;
         const ipAddress = useFirstIps ? subnet.firstUsableHost : subnet.lastUsableHost;
@@ -255,8 +251,6 @@ const PANOSConfigGenerator: React.FC<PANOSConfigGeneratorProps> = ({ subnets, or
             Export CSV
           </Button>
           <Button 
-            variant="outline" 
-            size="sm" 
             onClick={generatePANOSConfig}
             className="gap-2"
           >
