@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
@@ -212,7 +211,6 @@ const Index = () => {
                     <VOSSConfigGenerator 
                       subnets={subnets} 
                       originalSubnet={originalSubnet}
-                      showResults={false}
                     />
                   </TabsContent>
                   
@@ -220,7 +218,6 @@ const Index = () => {
                     <PANOSConfigGenerator 
                       subnets={subnets} 
                       originalSubnet={originalSubnet}
-                      showResults={false}
                     />
                   </TabsContent>
 
@@ -228,7 +225,6 @@ const Index = () => {
                     <CSVExportGenerator
                       subnets={subnets}
                       originalSubnet={originalSubnet}
-                      showResults={false}
                     />
                   </TabsContent>
                 </Tabs>
