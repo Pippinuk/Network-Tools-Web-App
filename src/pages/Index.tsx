@@ -1,8 +1,7 @@
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Logo from '@/components/Logo';
@@ -27,7 +26,6 @@ interface SubnetInfo {
 }
 
 const Index = () => {
-  const navigate = useNavigate();
   const [subnets, setSubnets] = useState<SubnetInfo[]>([]);
   const [originalSubnet, setOriginalSubnet] = useState('');
   const [hasCalculated, setHasCalculated] = useState(false);
@@ -81,59 +79,6 @@ const Index = () => {
       console.error('Error parsing excluded VLANs:', error);
       return [];
     }
-  };
-
-  const handleVossConfigRedirect = () => {
-    const vlanId = parseInt(startingVlanId, 10);
-    
-    if (isNaN(vlanId) || vlanId < 1 || vlanId > 4094) {
-      toast({
-        title: "Invalid VLAN ID",
-        description: "VLAN ID must be between 1 and 4094.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (isReservedVlanId(vlanId)) {
-      toast({
-        title: "Reserved VLAN ID",
-        description: "VLAN ID 4048 and IDs 4060-4094 are system reserved by Extreme Networks VOSS.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const excludedVlansList = parseExcludedVlans(excludedVlans);
-    
-    if (excludedVlansList.includes(vlanId)) {
-      toast({
-        title: "Starting VLAN ID Excluded",
-        description: `The starting VLAN ID ${vlanId} is in your exclusion list.`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const lastVlanId = vlanId + subnets.length - 1 + excludedVlansList.filter(id => id > vlanId && id <= lastVlanId).length;
-    
-    for (let id = vlanId; id <= lastVlanId; id++) {
-      if (isReservedVlanId(id)) {
-        toast({
-          title: "Reserved VLAN ID in Range",
-          description: `VLAN IDs ${vlanId}-${lastVlanId} include reserved IDs (4048 or 4060-4094).`,
-          variant: "destructive"
-        });
-        return;
-      }
-    }
-    
-    sessionStorage.setItem('subnets', JSON.stringify(subnets));
-    sessionStorage.setItem('originalSubnet', originalSubnet);
-    sessionStorage.setItem('startingVlanId', startingVlanId);
-    sessionStorage.setItem('excludedVlans', excludedVlans);
-    
-    navigate('/voss-config');
   };
 
   const handleStartingVlanIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -257,14 +202,10 @@ const Index = () => {
                   </div>
                   
                   <TabsContent value="voss" className="mt-0">
-                    <Button 
-                      onClick={handleVossConfigRedirect}
-                      variant="outline"
-                      className="gap-2 mt-2"
-                    >
-                      <Server className="size-4" />
-                      Create VOSS VRRP Configuration
-                    </Button>
+                    <VOSSConfigGenerator 
+                      subnets={subnets} 
+                      originalSubnet={originalSubnet}
+                    />
                   </TabsContent>
                   
                   <TabsContent value="panos" className="mt-0">
