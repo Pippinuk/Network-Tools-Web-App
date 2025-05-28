@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
@@ -119,13 +120,13 @@ const Index = () => {
           <div className="max-w-3xl mx-auto space-y-4 py-12">
             <div className="inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
               <Network className="size-4 mr-2" /> 
-              IP Subnet Management
+              IP Subnet Management & Configuration Export
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-              Divide IP Subnets for Your VLANs
+              Divide IP Subnets & Generate Network Configurations
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Enter your IP subnet in CIDR notation and divide it into equal subnets for each VLAN, with detailed network information.
+              Enter your IP subnet in CIDR notation, divide it into equal subnets for each VLAN, and automatically generate ready-to-deploy configurations for VOSS, PAN-OS, and CSV export formats.
             </p>
           </div>
         </section>
