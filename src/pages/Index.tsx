@@ -30,7 +30,7 @@ const Index = () => {
   const [originalSubnet, setOriginalSubnet] = useState('');
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
-  const [startingVlanId, setStartingVlanId] = useState('1');
+  const [startingVlanId, setStartingVlanId] = useState('2'); // Changed default to 2
   const [configType, setConfigType] = useState<'voss' | 'panos' | 'csv'>('voss');
   const [excludedVlans, setExcludedVlans] = useState('');
   const { toast } = useToast();
@@ -139,6 +139,13 @@ const Index = () => {
           
           {hasCalculated && (
             <>
+              {/* Single Subnet Results Display */}
+              <SubnetResult 
+                subnets={subnets} 
+                originalSubnet={originalSubnet}
+                calculationMethod={calculationMethod}
+              />
+              
               <div className="glass-panel p-6 space-y-4 animate-fade-in">
                 <Tabs 
                   value={configType} 
@@ -205,6 +212,7 @@ const Index = () => {
                     <VOSSConfigGenerator 
                       subnets={subnets} 
                       originalSubnet={originalSubnet}
+                      showResults={false}
                     />
                   </TabsContent>
                   
@@ -212,6 +220,7 @@ const Index = () => {
                     <PANOSConfigGenerator 
                       subnets={subnets} 
                       originalSubnet={originalSubnet}
+                      showResults={false}
                     />
                   </TabsContent>
 
@@ -219,16 +228,11 @@ const Index = () => {
                     <CSVExportGenerator
                       subnets={subnets}
                       originalSubnet={originalSubnet}
+                      showResults={false}
                     />
                   </TabsContent>
                 </Tabs>
               </div>
-              
-              <SubnetResult 
-                subnets={subnets} 
-                originalSubnet={originalSubnet}
-                calculationMethod={calculationMethod}
-              />
             </>
           )}
         </div>

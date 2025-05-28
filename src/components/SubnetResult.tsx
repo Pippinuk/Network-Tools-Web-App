@@ -2,21 +2,18 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { subnetsToCsv, downloadFile, prefixToSubnetMask, generateVlanIds } from '@/lib/exportUtils';
-import { FileDown, Share2, ChevronsUpDown } from 'lucide-react';
-import { 
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { FileDown, Share2, ChevronRight, ChevronDown, Network, Globe, Router, Users } from 'lucide-react';
 import { formatNumber } from '@/lib/subnetUtils';
 import { useToast } from '@/components/ui/use-toast';
-import SubnetResultTable from './SubnetResultTable';
 import { 
   Table, 
   TableBody, 
   TableCell, 
+  TableHead,
+  TableHeader,
   TableRow 
 } from '@/components/ui/table';
 
@@ -41,18 +38,15 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
   className
 }) => {
   const [expandedSubnet, setExpandedSubnet] = useState<string | null>(null);
-  const [copiedText, setCopiedText] = useState<string | null>(null);
   const [vlanIds, setVlanIds] = useState<Record<number, number>>({});
-  const [vlanNames, setVlanNames] = useState<Record<number, string>>({});
   const { toast } = useToast();
 
-  // Initialize VLAN IDs based on session storage
+  // Initialize VLAN IDs based on session storage with default starting at 2
   React.useEffect(() => {
-    const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+    const storedStartingVlanId = sessionStorage.getItem('startingVlanId') || '2';
     const storedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
     const startVlanId = parseInt(storedStartingVlanId, 10);
     
-    // Parse excluded VLANs
     const parsedExcluded = parseExcludedVlans(storedExcludedVlans);
     
     if (!isNaN(startVlanId) && startVlanId > 0 && startVlanId <= 4094) {
@@ -60,9 +54,8 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
       setVlanIds(newVlanIds);
     }
     
-    // Listen for changes
     const handleStorageChange = () => {
-      const updatedStartingVlanId = sessionStorage.getItem('startingVlanId') || '1';
+      const updatedStartingVlanId = sessionStorage.getItem('startingVlanId') || '2';
       const updatedExcludedVlans = sessionStorage.getItem('excludedVlans') || '';
       const updatedStartVlanId = parseInt(updatedStartingVlanId, 10);
       const updatedParsedExcluded = parseExcludedVlans(updatedExcludedVlans);
@@ -98,18 +91,12 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
     }
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedText(text);
-    setTimeout(() => setCopiedText(null), 2000);
+  const generateVlanName = (vlanId: number): string => {
+    return `VLAN-${vlanId}`;
   };
 
   const toggleExpand = (subnet: string) => {
-    if (expandedSubnet === subnet) {
-      setExpandedSubnet(null);
-    } else {
-      setExpandedSubnet(subnet);
-    }
+    setExpandedSubnet(expandedSubnet === subnet ? null : subnet);
   };
 
   const handleExportCsv = () => {
@@ -138,18 +125,21 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
   const targetMask = subnets[0].subnet.split('/')[1];
 
   return (
-    <div className={cn('glass-panel p-6 space-y-6 w-full opacity-0 animate-slide-up', className)} style={{animationFillMode: 'forwards', animationDelay: '0.2s'}}>
-      <div className="space-y-2">
+    <Card className={cn('animate-fade-in', className)}>
+      <CardHeader>
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-medium">Subnet Results</h3>
+          <CardTitle className="flex items-center gap-2">
+            <Network className="size-5 text-primary" />
+            Subnet Results
+          </CardTitle>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleExportCsv}
-            className="gap-2 text-sm"
+            className="gap-2"
           >
             <FileDown className="size-4" />
-            <span>Export CSV</span>
+            Export CSV
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
@@ -158,92 +148,118 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
             : `Original subnet ${originalSubnet} divided into /${targetMask} subnets (${subnets.length} total)`
           }
         </p>
-        <Separator className="my-4" />
-      </div>
+      </CardHeader>
+      
+      <CardContent className="space-y-4">
+        {/* Stylish Subnet Overview Table */}
+        <div className="border rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="w-20">VLAN</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Subnet</TableHead>
+                <TableHead className="text-right">Hosts</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {subnets.map((subnet, index) => {
+                const currentVlanId = vlanIds[index] || (parseInt(sessionStorage.getItem('startingVlanId') || '2', 10) + index);
+                const vlanName = generateVlanName(currentVlanId);
+                const isExpanded = expandedSubnet === subnet.subnet;
+                
+                return (
+                  <React.Fragment key={subnet.subnet}>
+                    <TableRow 
+                      className="cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleExpand(subnet.subnet)}
+                    >
+                      <TableCell>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          {currentVlanId}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-medium">{vlanName}</TableCell>
+                      <TableCell className="font-mono text-sm">{subnet.subnet}</TableCell>
+                      <TableCell className="text-right text-sm">
+                        {formatNumber(subnet.hostsCount)}
+                      </TableCell>
+                      <TableCell>
+                        {isExpanded ? (
+                          <ChevronDown className="size-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="size-4 text-muted-foreground" />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    
+                    {isExpanded && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="p-0">
+                          <div className="p-4 bg-muted/20 border-t">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Globe className="size-4 text-blue-500" />
+                                  <span className="font-medium text-sm">Network Details</span>
+                                </div>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Network Address:</span>
+                                    <span className="font-mono">{subnet.networkAddress}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Subnet Mask:</span>
+                                    <span className="font-mono">{prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10))}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Broadcast:</span>
+                                    <span className="font-mono">{subnet.broadcastAddress}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <Users className="size-4 text-green-500" />
+                                  <span className="font-medium text-sm">Host Range</span>
+                                </div>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">First Host:</span>
+                                    <span className="font-mono">{subnet.firstUsableHost}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Last Host:</span>
+                                    <span className="font-mono">{subnet.lastUsableHost}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Total Hosts:</span>
+                                    <span className="font-medium">{formatNumber(subnet.hostsCount)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
 
-      {/* Table View */}
-      <SubnetResultTable 
-        subnets={subnets}
-        vlanIds={vlanIds}
-        vlanNames={vlanNames}
-      />
-
-      <div className="space-y-4 mt-6">
-        <h4 className="text-sm font-medium">Detailed Subnet Information</h4>
-        {subnets.map((subnet, index) => (
-          <Collapsible 
-            key={subnet.subnet} 
-            className="border border-border rounded-lg overflow-hidden transition-all duration-200 hover:border-primary/20"
-            open={expandedSubnet === subnet.subnet}
-            onOpenChange={() => toggleExpand(subnet.subnet)}
-          >
-            <div className="bg-muted/50 p-4 flex items-center justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="bg-primary/10 text-primary text-xs font-medium px-2 py-1 rounded-full">
-                    {calculationMethod === 'vlans' ? `VLAN ${vlanIds[index] || index + 1}` : `Subnet ${index + 1}`}
-                  </span>
-                  <h4 className="font-medium">{subnet.subnet}</h4>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatNumber(subnet.hostsCount)} usable hosts
-                </p>
-              </div>
-              
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-8">
-                  <ChevronsUpDown className="size-4" />
-                </Button>
-              </CollapsibleTrigger>
-            </div>
-            
-            <CollapsibleContent>
-              <div className="p-4 space-y-4 bg-background/50">
-                <Table>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium w-1/3">Network Address</TableCell>
-                      <TableCell className="font-mono">{subnet.networkAddress}</TableCell>
-                    </TableRow>
-                    
-                    <TableRow>
-                      <TableCell className="font-medium">Subnet Mask</TableCell>
-                      <TableCell className="font-mono">{prefixToSubnetMask(parseInt(subnet.subnet.split('/')[1], 10))}</TableCell>
-                    </TableRow>
-                    
-                    <TableRow>
-                      <TableCell className="font-medium">Broadcast Address</TableCell>
-                      <TableCell className="font-mono">{subnet.broadcastAddress}</TableCell>
-                    </TableRow>
-                    
-                    <TableRow>
-                      <TableCell className="font-medium">First Usable Host</TableCell>
-                      <TableCell className="font-mono">{subnet.firstUsableHost}</TableCell>
-                    </TableRow>
-                    
-                    <TableRow>
-                      <TableCell className="font-medium">Last Usable Host</TableCell>
-                      <TableCell className="font-mono">{subnet.lastUsableHost}</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        ))}
-      </div>
-
-      <div className="pt-2 flex justify-end">
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="gap-2 text-sm"
-        >
-          <Share2 className="size-3" />
-          <span>Share Results</span>
-        </Button>
-      </div>
-    </div>
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" className="gap-2">
+            <Share2 className="size-3" />
+            Share Results
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
