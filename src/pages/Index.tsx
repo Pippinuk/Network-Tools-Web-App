@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
@@ -146,7 +145,7 @@ const Index = () => {
                 calculationMethod={calculationMethod}
               />
               
-              <div className="glass-panel p-6 space-y-4 animate-fade-in">
+              <div className="glass-panel p-6 space-y-4 animate-fade-in" data-config-generator>
                 <Tabs 
                   value={configType} 
                   onValueChange={(value) => setConfigType(value as 'voss' | 'panos' | 'csv')}

@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { subnetsToCsv, downloadFile, prefixToSubnetMask, generateVlanIds } from '@/lib/exportUtils';
-import { FileDown, Share2, ChevronRight, ChevronDown, Network, Globe, Router, Users } from 'lucide-react';
+import { FileDown, Share2, ChevronRight, ChevronDown, Network, Globe, Router, Users, Settings } from 'lucide-react';
 import { formatNumber } from '@/lib/subnetUtils';
 import { useToast } from '@/components/ui/use-toast';
 import { 
@@ -99,6 +98,16 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
     setExpandedSubnet(expandedSubnet === subnet ? null : subnet);
   };
 
+  const scrollToConfigGenerator = () => {
+    const configSection = document.querySelector('[data-config-generator]');
+    if (configSection) {
+      configSection.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }
+  };
+
   const handleExportCsv = () => {
     try {
       const csvData = subnetsToCsv(subnets, originalSubnet, calculationMethod);
@@ -132,15 +141,26 @@ const SubnetResult: React.FC<SubnetResultProps> = ({
             <Network className="size-5 text-primary" />
             Subnet Results
           </CardTitle>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleExportCsv}
-            className="gap-2"
-          >
-            <FileDown className="size-4" />
-            Export CSV
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={scrollToConfigGenerator}
+              className="gap-2"
+            >
+              <Settings className="size-4" />
+              Generate Config
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExportCsv}
+              className="gap-2"
+            >
+              <FileDown className="size-4" />
+              Export CSV
+            </Button>
+          </div>
         </div>
         <p className="text-sm text-muted-foreground">
           {calculationMethod === 'vlans' 
