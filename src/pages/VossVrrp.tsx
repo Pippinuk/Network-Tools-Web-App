@@ -1,0 +1,47 @@
+import React from 'react';
+import { Separator } from '@/components/ui/separator';
+import Logo from '@/components/Logo';
+import Navigation from '@/components/Navigation';
+import VossVrrpBuilder from '@/components/VossVrrpBuilder';
+import { Server } from 'lucide-react';
+
+const VossVrrp = () => (
+  <div className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex flex-col theme-transition">
+    <header className="w-full max-w-7xl mx-auto flex justify-between items-center p-6">
+      <div className="flex items-center">
+        <Navigation />
+        <Logo />
+      </div>
+    </header>
+
+    <main className="flex-1 w-full max-w-6xl mx-auto p-6">
+      <section className="mb-10 text-center">
+        <div className="inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
+          <Server className="size-4 mr-2" />
+          Extreme Networks VOSS
+        </div>
+        <h1 className="mt-4 text-3xl md:text-4xl font-bold tracking-tight">
+          VOSS VLAN, I-SID &amp; VRRP Config Generator
+        </h1>
+        <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
+          Define VLANs and subnets manually, split a supernet automatically, or import a CSV — then generate
+          VLAN creation, I-SID assignment and VRRP configuration for your VOSS cluster.
+        </p>
+      </section>
+
+      <div className="glass-panel p-6">
+        <VossVrrpBuilder />
+      </div>
+    </main>
+
+    <footer className="w-full max-w-7xl mx-auto p-6 mt-auto">
+      <Separator className="mb-6" />
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-muted-foreground text-sm">
+        <Logo iconClassName="size-4" textClassName="text-base" />
+        <p>© {new Date().getFullYear()} SubnetSlicer. All rights reserved.</p>
+      </div>
+    </footer>
+  </div>
+);
+
+export default VossVrrp;
