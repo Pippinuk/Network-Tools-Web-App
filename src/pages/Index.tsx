@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
@@ -11,7 +13,7 @@ import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
 import PANOSConfigGenerator from '@/components/PANOSConfigGenerator';
 import CSVExportGenerator from '@/components/CSVExportGenerator';
 import { divideSubnet, divideSubnetByMask, divideRange } from '@/lib/subnetUtils';
-import { Network, Github, Server, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import { Network, Github, Server, Shield, AlertTriangle, FileSpreadsheet, ArrowRight } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -33,6 +35,7 @@ const Index = () => {
   const [configType, setConfigType] = useState<'voss' | 'panos' | 'csv'>('voss');
   const [excludedVlans, setExcludedVlans] = useState('');
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleCalculate = (subnet: string, divisions: number) => {
     try {
@@ -73,6 +76,21 @@ const Index = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const sendToVossBuilder = () => {
+    if (!subnets.length) return;
+    const start = parseInt(startingVlanId, 10);
+    sessionStorage.setItem(
+      'vossImport',
+      JSON.stringify({
+        subnets: subnets.map((s) => s.subnet),
+        startingVlanId: isNaN(start) ? 2 : start,
+        excludedVlans,
+        source: originalSubnet,
+      })
+    );
+    navigate('/voss');
   };
 
   const isReservedVlanId = (id: number): boolean => {
@@ -163,6 +181,14 @@ const Index = () => {
                 calculationMethod={calculationMethod}
               />
               
+              <div className="flex justify-end">
+                <Button onClick={sendToVossBuilder} className="gap-2">
+                  <Server className="size-4" />
+                  <span>Send subnets to VOSS generator</span>
+                  <ArrowRight className="size-4" />
+                </Button>
+              </div>
+
               <div className="glass-panel p-6 space-y-4 animate-fade-in" data-config-generator>
                 <Tabs 
                   value={configType} 
