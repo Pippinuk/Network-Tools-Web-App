@@ -327,3 +327,63 @@ export const generateComprehensiveCsv = (
   // Combine everything
   return metadata + header + '\n' + rows.join('\n');
 };
+
+/**
+ * CSV-escape a value
+ */
+const csvEscape = (value: string | number): string => {
+  const s = String(value ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+type SubnetInfoLike = {
+  subnet: string;
+  networkAddress: string;
+  broadcastAddress: string;
+  firstUsableHost: string;
+  lastUsableHost: string;
+  hostsCount: number;
+};
+
+/**
+ * NetBox "IPAM > Prefixes" bulk import CSV
+ */
+export const generateNetboxPrefixesCsv = (
+  subnets: SubnetInfoLike[],
+  vlanIds: Record<number, number> = {},
+  vlanNames: Record<number, string> = {},
+  originalSubnet = ''
+): string => {
+  const header = ['prefix', 'status', 'vlan_group', 'vlan', 'is_pool', 'description'].join(',');
+  const rows = subnets.map((s, index) => {
+    const vlanId = vlanIds[index] || index + 1;
+    const vlanName = vlanNames[index] || `VLAN-${vlanId}`;
+    const description = originalSubnet ? `${vlanName} (from ${originalSubnet})` : vlanName;
+    return [
+      csvEscape(s.subnet),
+      'active',
+      '',
+      csvEscape(vlanId),
+      'false',
+      csvEscape(description),
+    ].join(',');
+  });
+  return header + '\n' + rows.join('\n') + '\n';
+};
+
+/**
+ * NetBox "IPAM > VLANs" bulk import CSV
+ */
+export const generateNetboxVlansCsv = (
+  subnets: SubnetInfoLike[],
+  vlanIds: Record<number, number> = {},
+  vlanNames: Record<number, string> = {}
+): string => {
+  const header = ['vid', 'name', 'status', 'description'].join(',');
+  const rows = subnets.map((s, index) => {
+    const vlanId = vlanIds[index] || index + 1;
+    const vlanName = vlanNames[index] || `VLAN-${vlanId}`;
+    return [csvEscape(vlanId), csvEscape(vlanName), 'active', csvEscape(s.subnet)].join(',');
+  });
+  return header + '\n' + rows.join('\n') + '\n';
+};
