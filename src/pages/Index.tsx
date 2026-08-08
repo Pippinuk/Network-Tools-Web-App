@@ -9,13 +9,10 @@ import Logo from '@/components/Logo';
 import SubnetForm from '@/components/SubnetForm';
 import SubnetResult from '@/components/SubnetResult';
 import Navigation from '@/components/Navigation';
-import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
-import PANOSConfigGenerator from '@/components/PANOSConfigGenerator';
-import CSVExportGenerator from '@/components/CSVExportGenerator';
+import NetboxExportGenerator from '@/components/NetboxExportGenerator';
 import { divideSubnet, divideSubnetByMask, divideRange } from '@/lib/subnetUtils';
-import { Network, Github, Server, Shield, AlertTriangle, FileSpreadsheet, ArrowRight } from 'lucide-react';
+import { Network, Github, Server, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SubnetInfo {
   subnet: string;
@@ -32,7 +29,6 @@ const Index = () => {
   const [hasCalculated, setHasCalculated] = useState(false);
   const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
   const [startingVlanId, setStartingVlanId] = useState('2'); // Changed default to 2
-  const [configType, setConfigType] = useState<'voss' | 'panos' | 'csv'>('voss');
   const [excludedVlans, setExcludedVlans] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -160,7 +156,7 @@ const Index = () => {
               Divide IP Subnets & Generate Network Configurations
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Enter your IP subnet in CIDR notation, divide it into equal subnets for each VLAN, and automatically generate ready-to-deploy configurations for VOSS, PAN-OS, and CSV export formats.
+              Enter your IP subnet in CIDR notation, divide it into equal subnets for each VLAN, and automatically generate CSV exports ready for NetBox import.
             </p>
           </div>
         </section>
