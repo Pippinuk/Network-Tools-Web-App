@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Menu, Network } from 'lucide-react';
+import { Menu, Network, Server } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
