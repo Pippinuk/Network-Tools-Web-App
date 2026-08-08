@@ -244,13 +244,72 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="range" className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startIp" className="text-base">Start address</Label>
+              <Input
+                id="startIp"
+                placeholder="e.g. 192.168.0.224"
+                value={startIp}
+                onChange={(e) => setStartIp(e.target.value)}
+                className="input-glass"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endIp" className="text-base">End address</Label>
+              <Input
+                id="endIp"
+                placeholder="e.g. 192.168.2.192"
+                value={endIp}
+                onChange={(e) => setEndIp(e.target.value)}
+                className="input-glass"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <Label htmlFor="rangePrefix" className="flex items-center gap-2 text-base">
+              <Divide className="size-4" />
+              <span>Target Subnet Mask</span>
+            </Label>
+            <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
+              /{rangePrefix}
+            </span>
+          </div>
+
+          <Slider
+            id="rangePrefix"
+            min={8}
+            max={30}
+            step={1}
+            value={[rangePrefix]}
+            onValueChange={(value) => setRangePrefix(value[0])}
+            className="py-4"
+          />
+
+          <p className="text-xs text-muted-foreground">
+            The range does not need to be CIDR aligned — the first subnet starts at the block containing the start address, and subnets continue until the end address is covered.
+          </p>
+
+          {rangeValid && rangeCount !== null && (
+            <div className="bg-primary/5 p-3 rounded-md text-sm">
+              <p>This will create <strong>{rangeCount}</strong> subnets with <strong>{Math.pow(2, 32 - rangePrefix) - 2}</strong> usable hosts each.</p>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       <div className="flex gap-4 pt-2">
         <Button 
           type="submit" 
           className="flex-1 gap-2"
-          disabled={!isValid || (calculationMethod === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))}
+          disabled={
+            calculationMethod === 'range'
+              ? !rangeValid || rangeCount === null
+              : !isValid || (calculationMethod === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))
+          }
         >
           <SplitSquareVertical className="size-4" />
           <span>Slice Subnet</span>
