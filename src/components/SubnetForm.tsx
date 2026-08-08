@@ -150,25 +150,27 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
       onSubmit={handleSubmit} 
       className={cn('glass-panel p-6 space-y-6 max-w-md w-full mx-auto animate-fade-in', className)}
     >
-      <div className="space-y-2">
-        <Label htmlFor="subnet" className="flex items-center gap-2 text-base">
-          <Network className="size-4" />
-          <span>IP Subnet (CIDR notation)</span>
-        </Label>
-        <Input
-          id="subnet"
-          placeholder="e.g. 192.168.1.0/24"
-          value={subnet}
-          onChange={(e) => setSubnet(e.target.value)}
-          className="input-glass"
-        />
-        <p className="text-xs text-muted-foreground">
-          Enter a subnet in CIDR notation (e.g., 192.168.1.0/24)
-        </p>
-      </div>
+      {calculationMethod !== 'range' && (
+        <div className="space-y-2">
+          <Label htmlFor="subnet" className="flex items-center gap-2 text-base">
+            <Network className="size-4" />
+            <span>IP Subnet (CIDR notation)</span>
+          </Label>
+          <Input
+            id="subnet"
+            placeholder="e.g. 192.168.1.0/24"
+            value={subnet}
+            onChange={(e) => setSubnet(e.target.value)}
+            className="input-glass"
+          />
+          <p className="text-xs text-muted-foreground">
+            Enter a subnet in CIDR notation (e.g., 192.168.1.0/24)
+          </p>
+        </div>
+      )}
 
-      <Tabs value={calculationMethod} onValueChange={(value) => setCalculationMethod(value as 'vlans' | 'mask')} className="w-full">
-        <TabsList className="grid grid-cols-2 w-full">
+      <Tabs value={calculationMethod} onValueChange={(value) => setCalculationMethod(value as 'vlans' | 'mask' | 'range')} className="w-full">
+        <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="vlans" className="flex items-center gap-2">
             <Users className="size-4" />
             <span>By VLANs</span>
@@ -177,7 +179,12 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
             <Divide className="size-4" />
             <span>By Mask</span>
           </TabsTrigger>
+          <TabsTrigger value="range" className="flex items-center gap-2">
+            <MoveHorizontal className="size-4" />
+            <span>By Range</span>
+          </TabsTrigger>
         </TabsList>
+        
         
         <TabsContent value="vlans" className="space-y-4 mt-4">
           <div className="flex justify-between items-center">
