@@ -5,17 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isValidSubnet, calculateSubnetCount } from '@/lib/subnetUtils';
+import { isValidSubnet, isValidIpAddress, calculateSubnetCount, countRangeSubnets } from '@/lib/subnetUtils';
 import { cn } from '@/lib/utils';
-import { Network, Users, SplitSquareVertical, Divide } from 'lucide-react';
+import { Network, Users, SplitSquareVertical, Divide, MoveHorizontal } from 'lucide-react';
 
 interface SubnetFormProps {
   onCalculate: (subnet: string, divisions: number) => void;
   onCalculateByMask: (subnet: string, targetPrefix: number) => void;
+  onCalculateByRange?: (startIp: string, endIp: string, targetPrefix: number) => void;
   className?: string;
 }
 
-const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask, className }) => {
+const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask, onCalculateByRange, className }) => {
   const [subnet, setSubnet] = useState('');
   const [divisionsInput, setDivisionsInput] = useState('4');
   const [divisions, setDivisions] = useState(4);
@@ -23,9 +24,15 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
   const [maxPrefix, setMaxPrefix] = useState(30);
   const [minPrefix, setMinPrefix] = useState(0);
   const [isValid, setIsValid] = useState(false);
-  const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
+  const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask' | 'range'>('vlans');
   const [subnetCount, setSubnetCount] = useState<number | null>(null);
+  const [startIp, setStartIp] = useState('');
+  const [endIp, setEndIp] = useState('');
+  const [rangePrefix, setRangePrefix] = useState(24);
   const { toast } = useToast();
+
+  const rangeValid = isValidIpAddress(startIp) && isValidIpAddress(endIp);
+  const rangeCount = rangeValid ? countRangeSubnets(startIp, endIp, rangePrefix) : null;
   
   useEffect(() => {
     const valid = isValidSubnet(subnet);
