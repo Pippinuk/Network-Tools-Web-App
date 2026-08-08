@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -70,6 +70,51 @@ const VossVrrpBuilder: React.FC = () => {
   const [isid, setIsid] = useState<IsidOptions>(defaultIsid);
   const [vrrp, setVrrp] = useState<VrrpOptions>(defaultVrrp);
   const [mltId, setMltId] = useState('');
+
+  // Import subnets handed over from the Subnet Slicer
+  useEffect(() => {
+    const raw = sessionStorage.getItem('vossImport');
+    if (!raw) return;
+    sessionStorage.removeItem('vossImport');
+
+    try {
+      const payload = JSON.parse(raw) as {
+        subnets?: string[];
+        startingVlanId?: number;
+        excludedVlans?: string;
+        source?: string;
+      };
+      const list = (payload.subnets ?? []).filter(Boolean);
+      if (!list.length) return;
+
+      const start = payload.startingVlanId && payload.startingVlanId >= 2 ? payload.startingVlanId : 2;
+      const excludedList = parseNumberList(payload.excludedVlans ?? '');
+      const ids = buildVlanIdRange(start, list.length, excludedList);
+
+      const imported: VlanRow[] = list.map((subnet, index) => {
+        const id = ids[index] ?? start + index;
+        return {
+          vlanId: id,
+          name: `VLAN-${id}`,
+          subnet,
+          isid: computeIsid(id, defaultIsid),
+        };
+      });
+
+      setRows(imported);
+      setCsvErrors([]);
+      setMode('manual');
+      setStartVlan(String(start));
+      setExcluded(payload.excludedVlans ?? '');
+      toast({
+        title: 'Subnets imported',
+        description: `${imported.length} subnets from the Subnet Slicer${payload.source ? ` (${payload.source})` : ''} loaded.`,
+      });
+    } catch {
+      // ignore malformed payloads
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const errors = useMemo(() => validateRows(rows), [rows]);
 
