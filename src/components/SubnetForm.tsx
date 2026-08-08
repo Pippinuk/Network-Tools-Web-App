@@ -62,7 +62,32 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (calculationMethod === 'range') {
+      if (!rangeValid) {
+        toast({
+          title: "Invalid Input",
+          description: "Please enter valid start and end IP addresses (e.g., 192.168.0.224 and 192.168.2.192)",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (rangeCount === null) {
+        toast({
+          title: "Invalid Range",
+          description: "The end address must be greater than or equal to the start address",
+          variant: "destructive"
+        });
+        return;
+      }
+      onCalculateByRange?.(startIp, endIp, rangePrefix);
+      toast({
+        title: "Subnets Calculated",
+        description: `Split ${startIp} – ${endIp} into ${rangeCount} /${rangePrefix} subnets`,
+      });
+      return;
+    }
+
     if (!isValid) {
       toast({
         title: "Invalid Input",
@@ -103,6 +128,9 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
     setDivisions(4);
     setTargetPrefix(24);
     setSubnetCount(null);
+    setStartIp('');
+    setEndIp('');
+    setRangePrefix(24);
   };
 
   const handleDivisionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
