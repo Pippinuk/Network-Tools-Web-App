@@ -43,6 +43,14 @@ const Navigation = () => {
               <Network className="size-5" />
               <span>Subnet Slicer</span>
             </Link>
+            <Link
+              to="/voss"
+              className="flex items-center gap-3 rounded-md p-3 text-sm font-medium hover:bg-accent"
+              onClick={() => setOpen(false)}
+            >
+              <Server className="size-5" />
+              <span>VOSS VLAN / I-SID / VRRP</span>
+            </Link>
           </div>
         </SheetContent>
       </Sheet>
