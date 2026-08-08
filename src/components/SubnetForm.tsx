@@ -5,17 +5,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isValidSubnet, calculateSubnetCount } from '@/lib/subnetUtils';
+import { isValidSubnet, isValidIpAddress, calculateSubnetCount, countRangeSubnets } from '@/lib/subnetUtils';
 import { cn } from '@/lib/utils';
-import { Network, Users, SplitSquareVertical, Divide } from 'lucide-react';
+import { Network, Users, SplitSquareVertical, Divide, MoveHorizontal } from 'lucide-react';
 
 interface SubnetFormProps {
   onCalculate: (subnet: string, divisions: number) => void;
   onCalculateByMask: (subnet: string, targetPrefix: number) => void;
+  onCalculateByRange?: (startIp: string, endIp: string, targetPrefix: number) => void;
   className?: string;
 }
 
-const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask, className }) => {
+const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask, onCalculateByRange, className }) => {
   const [subnet, setSubnet] = useState('');
   const [divisionsInput, setDivisionsInput] = useState('4');
   const [divisions, setDivisions] = useState(4);
@@ -23,9 +24,15 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
   const [maxPrefix, setMaxPrefix] = useState(30);
   const [minPrefix, setMinPrefix] = useState(0);
   const [isValid, setIsValid] = useState(false);
-  const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask'>('vlans');
+  const [calculationMethod, setCalculationMethod] = useState<'vlans' | 'mask' | 'range'>('vlans');
   const [subnetCount, setSubnetCount] = useState<number | null>(null);
+  const [startIp, setStartIp] = useState('');
+  const [endIp, setEndIp] = useState('');
+  const [rangePrefix, setRangePrefix] = useState(24);
   const { toast } = useToast();
+
+  const rangeValid = isValidIpAddress(startIp) && isValidIpAddress(endIp);
+  const rangeCount = rangeValid ? countRangeSubnets(startIp, endIp, rangePrefix) : null;
   
   useEffect(() => {
     const valid = isValidSubnet(subnet);
@@ -55,7 +62,32 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (calculationMethod === 'range') {
+      if (!rangeValid) {
+        toast({
+          title: "Invalid Input",
+          description: "Please enter valid start and end IP addresses (e.g., 192.168.0.224 and 192.168.2.192)",
+          variant: "destructive"
+        });
+        return;
+      }
+      if (rangeCount === null) {
+        toast({
+          title: "Invalid Range",
+          description: "The end address must be greater than or equal to the start address",
+          variant: "destructive"
+        });
+        return;
+      }
+      onCalculateByRange?.(startIp, endIp, rangePrefix);
+      toast({
+        title: "Subnets Calculated",
+        description: `Split ${startIp} – ${endIp} into ${rangeCount} /${rangePrefix} subnets`,
+      });
+      return;
+    }
+
     if (!isValid) {
       toast({
         title: "Invalid Input",
@@ -96,6 +128,9 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
     setDivisions(4);
     setTargetPrefix(24);
     setSubnetCount(null);
+    setStartIp('');
+    setEndIp('');
+    setRangePrefix(24);
   };
 
   const handleDivisionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,25 +150,27 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
       onSubmit={handleSubmit} 
       className={cn('glass-panel p-6 space-y-6 max-w-md w-full mx-auto animate-fade-in', className)}
     >
-      <div className="space-y-2">
-        <Label htmlFor="subnet" className="flex items-center gap-2 text-base">
-          <Network className="size-4" />
-          <span>IP Subnet (CIDR notation)</span>
-        </Label>
-        <Input
-          id="subnet"
-          placeholder="e.g. 192.168.1.0/24"
-          value={subnet}
-          onChange={(e) => setSubnet(e.target.value)}
-          className="input-glass"
-        />
-        <p className="text-xs text-muted-foreground">
-          Enter a subnet in CIDR notation (e.g., 192.168.1.0/24)
-        </p>
-      </div>
+      {calculationMethod !== 'range' && (
+        <div className="space-y-2">
+          <Label htmlFor="subnet" className="flex items-center gap-2 text-base">
+            <Network className="size-4" />
+            <span>IP Subnet (CIDR notation)</span>
+          </Label>
+          <Input
+            id="subnet"
+            placeholder="e.g. 192.168.1.0/24"
+            value={subnet}
+            onChange={(e) => setSubnet(e.target.value)}
+            className="input-glass"
+          />
+          <p className="text-xs text-muted-foreground">
+            Enter a subnet in CIDR notation (e.g., 192.168.1.0/24)
+          </p>
+        </div>
+      )}
 
-      <Tabs value={calculationMethod} onValueChange={(value) => setCalculationMethod(value as 'vlans' | 'mask')} className="w-full">
-        <TabsList className="grid grid-cols-2 w-full">
+      <Tabs value={calculationMethod} onValueChange={(value) => setCalculationMethod(value as 'vlans' | 'mask' | 'range')} className="w-full">
+        <TabsList className="grid grid-cols-3 w-full">
           <TabsTrigger value="vlans" className="flex items-center gap-2">
             <Users className="size-4" />
             <span>By VLANs</span>
@@ -142,7 +179,12 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
             <Divide className="size-4" />
             <span>By Mask</span>
           </TabsTrigger>
+          <TabsTrigger value="range" className="flex items-center gap-2">
+            <MoveHorizontal className="size-4" />
+            <span>By Range</span>
+          </TabsTrigger>
         </TabsList>
+        
         
         <TabsContent value="vlans" className="space-y-4 mt-4">
           <div className="flex justify-between items-center">
@@ -202,13 +244,72 @@ const SubnetForm: React.FC<SubnetFormProps> = ({ onCalculate, onCalculateByMask,
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="range" className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="startIp" className="text-base">Start address</Label>
+              <Input
+                id="startIp"
+                placeholder="e.g. 192.168.0.224"
+                value={startIp}
+                onChange={(e) => setStartIp(e.target.value)}
+                className="input-glass"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="endIp" className="text-base">End address</Label>
+              <Input
+                id="endIp"
+                placeholder="e.g. 192.168.2.192"
+                value={endIp}
+                onChange={(e) => setEndIp(e.target.value)}
+                className="input-glass"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <Label htmlFor="rangePrefix" className="flex items-center gap-2 text-base">
+              <Divide className="size-4" />
+              <span>Target Subnet Mask</span>
+            </Label>
+            <span className="text-sm font-medium bg-primary/10 text-primary px-2 py-1 rounded-md">
+              /{rangePrefix}
+            </span>
+          </div>
+
+          <Slider
+            id="rangePrefix"
+            min={8}
+            max={30}
+            step={1}
+            value={[rangePrefix]}
+            onValueChange={(value) => setRangePrefix(value[0])}
+            className="py-4"
+          />
+
+          <p className="text-xs text-muted-foreground">
+            The range does not need to be CIDR aligned — the first subnet starts at the block containing the start address, and subnets continue until the end address is covered.
+          </p>
+
+          {rangeValid && rangeCount !== null && (
+            <div className="bg-primary/5 p-3 rounded-md text-sm">
+              <p>This will create <strong>{rangeCount}</strong> subnets with <strong>{Math.pow(2, 32 - rangePrefix) - 2}</strong> usable hosts each.</p>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       <div className="flex gap-4 pt-2">
         <Button 
           type="submit" 
           className="flex-1 gap-2"
-          disabled={!isValid || (calculationMethod === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))}
+          disabled={
+            calculationMethod === 'range'
+              ? !rangeValid || rangeCount === null
+              : !isValid || (calculationMethod === 'vlans' && (!divisionsInput || parseInt(divisionsInput, 10) < 2))
+          }
         >
           <SplitSquareVertical className="size-4" />
           <span>Slice Subnet</span>

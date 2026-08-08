@@ -10,7 +10,7 @@ import Navigation from '@/components/Navigation';
 import VOSSConfigGenerator from '@/components/VOSSConfigGenerator';
 import PANOSConfigGenerator from '@/components/PANOSConfigGenerator';
 import CSVExportGenerator from '@/components/CSVExportGenerator';
-import { divideSubnet, divideSubnetByMask } from '@/lib/subnetUtils';
+import { divideSubnet, divideSubnetByMask, divideRange } from '@/lib/subnetUtils';
 import { Network, Github, Server, Shield, AlertTriangle, FileSpreadsheet } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -55,6 +55,23 @@ const Index = () => {
       setCalculationMethod('mask');
     } catch (error) {
       console.error('Calculation error:', error);
+    }
+  };
+
+  const handleCalculateByRange = (startIp: string, endIp: string, targetPrefix: number) => {
+    try {
+      const results = divideRange(startIp, endIp, targetPrefix);
+      setSubnets(results);
+      setOriginalSubnet(`${startIp} - ${endIp}`);
+      setHasCalculated(true);
+      setCalculationMethod('mask');
+    } catch (error) {
+      console.error('Calculation error:', error);
+      toast({
+        title: "Calculation Error",
+        description: error instanceof Error ? error.message : "Unable to split this range",
+        variant: "destructive"
+      });
     }
   };
 
@@ -134,6 +151,7 @@ const Index = () => {
           <SubnetForm 
             onCalculate={handleCalculate}
             onCalculateByMask={handleCalculateByMask}
+            onCalculateByRange={handleCalculateByRange}
           />
           
           {hasCalculated && (

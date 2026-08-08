@@ -226,3 +226,74 @@ export const divideSubnetByMask = (subnet: string, targetPrefix: number): Array<
 export const formatNumber = (num: number): string => {
   return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
+
+/**
+ * Divides an arbitrary IP address range (not necessarily CIDR aligned)
+ * into subnets of the given target prefix size.
+ * The first subnet is aligned to the block containing the start address,
+ * and subnets are generated until the end address is covered.
+ */
+export const divideRange = (startIp: string, endIp: string, targetPrefix: number): Array<{
+  subnet: string;
+  networkAddress: string;
+  broadcastAddress: string;
+  firstUsableHost: string;
+  lastUsableHost: string;
+  hostsCount: number;
+}> => {
+  if (!isValidIpAddress(startIp) || !isValidIpAddress(endIp)) {
+    throw new Error("Start and end must be valid IPv4 addresses");
+  }
+
+  if (targetPrefix < 1 || targetPrefix > 30) {
+    throw new Error("Target prefix must be between /1 and /30");
+  }
+
+  const startNum = ipToNumber(startIp);
+  const endNum = ipToNumber(endIp);
+
+  if (endNum < startNum) {
+    throw new Error("End address must be greater than or equal to the start address");
+  }
+
+  const subnetSize = Math.pow(2, 32 - targetPrefix);
+  const mask = getPrefixMask(targetPrefix);
+  const alignedStart = (startNum & mask) >>> 0;
+
+  const count = Math.floor((endNum - alignedStart) / subnetSize) + 1;
+
+  if (count > 4096) {
+    throw new Error("This range would create more than 4096 subnets. Use a larger subnet size or a smaller range.");
+  }
+
+  const subnets = [];
+
+  for (let i = 0; i < count; i++) {
+    const subnetStartIp = alignedStart + (i * subnetSize);
+    const networkAddress = numberToIp(subnetStartIp);
+
+    subnets.push({
+      subnet: `${networkAddress}/${targetPrefix}`,
+      networkAddress,
+      broadcastAddress: numberToIp(subnetStartIp + subnetSize - 1),
+      firstUsableHost: numberToIp(subnetStartIp + 1),
+      lastUsableHost: numberToIp(subnetStartIp + subnetSize - 2),
+      hostsCount: getHostsCount(targetPrefix)
+    });
+  }
+
+  return subnets;
+};
+
+/**
+ * Counts how many subnets of a target prefix a range would produce
+ */
+export const countRangeSubnets = (startIp: string, endIp: string, targetPrefix: number): number | null => {
+  if (!isValidIpAddress(startIp) || !isValidIpAddress(endIp)) return null;
+  const startNum = ipToNumber(startIp);
+  const endNum = ipToNumber(endIp);
+  if (endNum < startNum) return null;
+  const subnetSize = Math.pow(2, 32 - targetPrefix);
+  const alignedStart = (ipToNumber(startIp) & getPrefixMask(targetPrefix)) >>> 0;
+  return Math.floor((endNum - alignedStart) / subnetSize) + 1;
+};
