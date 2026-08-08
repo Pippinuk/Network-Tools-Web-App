@@ -190,89 +190,50 @@ const Index = () => {
               </div>
 
               <div className="glass-panel p-6 space-y-4 animate-fade-in" data-config-generator>
-                <Tabs 
-                  value={configType} 
-                  onValueChange={(value) => setConfigType(value as 'voss' | 'panos' | 'csv')}
-                  className="w-full"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium">Network Configuration Generator</h3>
-                    <TabsList className="grid grid-cols-3 w-[400px]">
-                      <TabsTrigger value="voss" className="flex items-center gap-2">
-                        <Server className="size-4" />
-                        <span>VOSS VRRP</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="panos" className="flex items-center gap-2">
-                        <Shield className="size-4" />
-                        <span>Palo Alto PANOS</span>
-                      </TabsTrigger>
-                      <TabsTrigger value="csv" className="flex items-center gap-2">
-                        <FileSpreadsheet className="size-4" />
-                        <span>CSV Export</span>
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="startingVlanId" className="text-sm">
-                        Starting VLAN ID
-                      </Label>
-                      <Input
-                        id="startingVlanId"
-                        type="number"
-                        min={1}
-                        max={4094}
-                        value={startingVlanId}
-                        onChange={handleStartingVlanIdChange}
-                        placeholder="Enter Starting VLAN ID (1-4094)"
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        VLAN IDs will be assigned incrementally from this number
-                      </p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="excludedVlans" className="text-sm flex items-center gap-1">
-                        Excluded VLAN IDs
-                        <AlertTriangle className="size-3 text-yellow-500" />
-                      </Label>
-                      <Input
-                        id="excludedVlans"
-                        value={excludedVlans}
-                        onChange={handleExcludedVlansChange}
-                        placeholder="e.g. 100,200,300"
-                        className="w-full"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Comma-separated list of VLAN IDs to exclude
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <TabsContent value="voss" className="mt-0">
-                    <VOSSConfigGenerator 
-                      subnets={subnets} 
-                      originalSubnet={originalSubnet}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startingVlanId" className="text-sm">
+                      Starting VLAN ID
+                    </Label>
+                    <Input
+                      id="startingVlanId"
+                      type="number"
+                      min={1}
+                      max={4094}
+                      value={startingVlanId}
+                      onChange={handleStartingVlanIdChange}
+                      placeholder="Enter Starting VLAN ID (1-4094)"
+                      className="w-full"
                     />
-                  </TabsContent>
-                  
-                  <TabsContent value="panos" className="mt-0">
-                    <PANOSConfigGenerator 
-                      subnets={subnets} 
-                      originalSubnet={originalSubnet}
-                    />
-                  </TabsContent>
+                    <p className="text-xs text-muted-foreground">
+                      VLAN IDs will be assigned incrementally from this number
+                    </p>
+                  </div>
 
-                  <TabsContent value="csv" className="mt-0">
-                    <CSVExportGenerator
-                      subnets={subnets}
-                      originalSubnet={originalSubnet}
+                  <div className="space-y-2">
+                    <Label htmlFor="excludedVlans" className="text-sm flex items-center gap-1">
+                      Excluded VLAN IDs
+                      <AlertTriangle className="size-3 text-yellow-500" />
+                    </Label>
+                    <Input
+                      id="excludedVlans"
+                      value={excludedVlans}
+                      onChange={handleExcludedVlansChange}
+                      placeholder="e.g. 100,200,300"
+                      className="w-full"
                     />
-                  </TabsContent>
-                </Tabs>
+                    <p className="text-xs text-muted-foreground">
+                      Comma-separated list of VLAN IDs to exclude
+                    </p>
+                  </div>
+                </div>
+
+                <NetboxExportGenerator
+                  subnets={subnets}
+                  originalSubnet={originalSubnet}
+                />
               </div>
+
             </>
           )}
         </div>
