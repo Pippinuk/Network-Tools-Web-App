@@ -5,7 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: "/network-tools-web-app/",
+  // Relative assets work both at the GitHub Pages project URL and the custom domain.
+  base: "./",
   server: {
     host: "::",
     port: 8080,
