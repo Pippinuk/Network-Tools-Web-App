@@ -64,6 +64,38 @@ This project is built with:
 
 Simply open [Lovable](https://lovable.dev/projects/6b6a5d95-00c2-4822-887a-068fd8cbe7f0) and click on Share -> Publish.
 
+## Deploy to GitHub Pages
+
+This project is configured to deploy to GitHub Pages at:
+
+```
+https://Pippinuk.github.io/network-tools-web-app
+```
+
+### Option 1: Automatic deployment with GitHub Actions
+
+1. Push these changes to your GitHub repository.
+2. Go to **Settings → Pages** in your repo.
+3. Under **Source**, select **GitHub Actions**.
+4. The included `.github/workflows/deploy.yml` will build and deploy the site on every push to `main`.
+
+### Option 2: Manual deployment from your machine
+
+1. Install dependencies:
+   ```sh
+   npm install
+   ```
+2. Build the project:
+   ```sh
+   npm run build
+   ```
+3. Deploy the `dist` folder:
+   ```sh
+   npm run deploy
+   ```
+
+The site uses `HashRouter`, so routes work as `https://Pippinuk.github.io/network-tools-web-app/#/voss`.
+
 ## I want to use a custom domain - is that possible?
 
 We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
