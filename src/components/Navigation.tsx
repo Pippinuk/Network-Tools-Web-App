@@ -35,8 +35,16 @@ const Navigation = () => {
             </SheetDescription>
           </SheetHeader>
           <div className="flex flex-col gap-4">
+            <Link
+              to="/"
+              className="flex items-center gap-3 rounded-md p-3 text-sm font-medium hover:bg-accent"
+              onClick={() => setOpen(false)}
+            >
+              <Home className="size-5" />
+              <span>Home</span>
+            </Link>
             <Link 
-              to="/" 
+              to="/subnet" 
               className="flex items-center gap-3 rounded-md p-3 text-sm font-medium hover:bg-accent"
               onClick={() => setOpen(false)}
             >
