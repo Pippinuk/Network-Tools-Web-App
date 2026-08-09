@@ -69,14 +69,14 @@ Simply open [Lovable](https://lovable.dev/projects/6b6a5d95-00c2-4822-887a-068fd
 This project is configured to deploy to GitHub Pages at:
 
 ```
-https://Pippinuk.github.io/network-tools-web-app
+https://Pippinuk.github.io/Network-Tools-Web-App
 ```
 
 ### Option 1: Automatic deployment with GitHub Actions
 
 1. Push these changes to your GitHub repository.
 2. Go to **Settings → Pages** in your repo.
-3. Under **Source**, select **GitHub Actions**.
+3. Under **Build and deployment → Source**, select **GitHub Actions** (not **Deploy from a branch**).
 4. The included `.github/workflows/deploy.yml` will build and deploy the site on every push to `main`.
 
 ### Option 2: Manual deployment from your machine
@@ -94,7 +94,7 @@ https://Pippinuk.github.io/network-tools-web-app
    npm run deploy
    ```
 
-The site uses `HashRouter`, so routes work as `https://Pippinuk.github.io/network-tools-web-app/#/voss`.
+The Pages URL redirects to the configured custom domain, `https://nettools.pjl.org.uk/`. The site uses `HashRouter`, so the VOSS route is `https://nettools.pjl.org.uk/#/voss`.
 
 ## I want to use a custom domain - is that possible?
 
