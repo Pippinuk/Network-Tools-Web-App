@@ -423,6 +423,38 @@ const VossVrrpBuilder: React.FC = () => {
             />
             <Label htmlFor="backupMaster">Enable VRRP backup-master</Label>
           </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="dhcpEnabled"
+              checked={!!vrrp.dhcpEnabled}
+              onCheckedChange={(checked) => setVrrp({ ...vrrp, dhcpEnabled: checked })}
+            />
+            <Label htmlFor="dhcpEnabled">Enable DHCP relay on each VLAN interface</Label>
+          </div>
+          {vrrp.dhcpEnabled && (
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[0, 1, 2].map((i) => {
+                const value = (vrrp.dhcpServers || [])[i] || '';
+                const invalid = value.trim().length > 0 && !isValidIpv4(value);
+                return (
+                  <div key={i} className="space-y-2">
+                    <Label htmlFor={`dhcpServer${i}`}>DHCP server {i + 1}{i === 0 ? '' : ' (optional)'}</Label>
+                    <Input
+                      id={`dhcpServer${i}`}
+                      value={value}
+                      placeholder="e.g. 10.0.0.10"
+                      onChange={(e) => {
+                        const next = [...(vrrp.dhcpServers || ['', '', ''])];
+                        next[i] = e.target.value;
+                        setVrrp({ ...vrrp, dhcpServers: next });
+                      }}
+                    />
+                    {invalid && <p className="text-xs text-destructive">Enter a valid IPv4 address</p>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
