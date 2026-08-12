@@ -48,6 +48,8 @@ const defaultVrrp: VrrpOptions = {
   priority: 200,
   backupMaster: true,
   memberPorts: '1/1-1/48',
+  dhcpEnabled: false,
+  dhcpServers: ['', '', ''],
 };
 
 const VossVrrpBuilder: React.FC = () => {
