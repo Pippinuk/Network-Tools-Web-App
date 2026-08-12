@@ -396,7 +396,7 @@ const VossVrrpBuilder: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="memberPorts">VLAN member ports</Label>
+              <Label htmlFor="memberPorts">VLAN member ports (optional)</Label>
               <Input
                 id="memberPorts"
                 value={vrrp.memberPorts}
