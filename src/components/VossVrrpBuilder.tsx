@@ -25,6 +25,7 @@ import {
   IsidOptions,
   VlanRow,
   VrrpOptions,
+  isValidIpv4,
   buildVlanIdRange,
   computeIsid,
   generateVossVrrpConfig,
