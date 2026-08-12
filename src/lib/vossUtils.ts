@@ -26,7 +26,12 @@ export interface VrrpOptions {
   backupMaster: boolean;
   memberPorts: string;
   mltId?: number;
+  dhcpEnabled?: boolean;
+  dhcpServers?: string[];
 }
+
+export const isValidIpv4 = (ip: string): boolean =>
+  /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip.trim());
 
 export const isReservedVlanId = (id: number): boolean =>
   id === 4048 || (id >= 4060 && id <= 4094);
