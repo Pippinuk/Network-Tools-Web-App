@@ -26,7 +26,12 @@ export interface VrrpOptions {
   backupMaster: boolean;
   memberPorts: string;
   mltId?: number;
+  dhcpEnabled?: boolean;
+  dhcpServers?: string[];
 }
+
+export const isValidIpv4 = (ip: string): boolean =>
+  /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/.test(ip.trim());
 
 export const isReservedVlanId = (id: number): boolean =>
   id === 4048 || (id >= 4060 && id <= 4094);
@@ -244,6 +249,19 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       lines.push(`ip vrrp ${row.vlanId} priority ${priority}`);
       if (vrrp.backupMaster) lines.push(`ip vrrp ${row.vlanId} backup-master enable`);
       lines.push(`ip vrrp ${row.vlanId} enable`);
+      const dhcpServers = (vrrp.dhcpServers || []).map((s) => s.trim()).filter(isValidIpv4).slice(0, 3);
+      if (vrrp.dhcpEnabled && dhcpServers.length > 0) {
+        lines.push('ip dhcp-relay');
+        lines.push('exit');
+        lines.push(`! DHCP relay forward paths for VLAN ${row.vlanId}`);
+        dhcpServers.forEach((server) => {
+          lines.push(`ip dhcp-relay fwd-path ${addr.virtualIp} ${server}`);
+          lines.push(`ip dhcp-relay fwd-path ${addr.virtualIp} ${server} enable`);
+          lines.push(`ip dhcp-relay fwd-path ${addr.virtualIp} ${server} mode bootp_dhcp`);
+        });
+        lines.push('');
+        return;
+      }
       lines.push('exit');
       lines.push('');
     });
