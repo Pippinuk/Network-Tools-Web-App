@@ -277,7 +277,10 @@ const VossVrrpBuilder: React.FC = () => {
 
         <TabsContent value="csv" className="mt-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Upload a CSV with the columns <span className="font-mono">vlan_id, vlan_name, subnet, isid</span>. Leave the I-SID blank to auto-generate it.
+            Upload a CSV with the columns{' '}
+            <span className="font-mono">vlan_id, vlan_name, subnet, isid, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
+            Leave the I-SID blank to auto-generate it. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
+            to the DHCP relay settings below.
           </p>
           <div className="flex flex-wrap gap-2">
             <input

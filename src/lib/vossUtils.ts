@@ -9,6 +9,8 @@ export interface VlanRow {
   name: string;
   subnet: string;
   isid: number;
+  dhcpEnabled?: boolean;
+  dhcpServers?: string[];
 }
 
 export type IsidMode = 'offset' | 'prefix';
@@ -128,11 +130,20 @@ export const prefixToMask = (prefix: number): string => {
   return [(mask >>> 24) & 255, (mask >>> 16) & 255, (mask >>> 8) & 255, mask & 255].join('.');
 };
 
-export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid
-100,Data,10.10.100.0/24,10100
-101,Voice,10.10.101.0/24,10101
-102,Wireless,10.10.102.0/24,
+export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
+100,Data,10.10.100.0/24,10100,yes,10.1.1.10,10.1.1.11,
+101,Voice,10.10.101.0/24,10101,yes,10.1.1.10,,
+102,Wireless,10.10.102.0/24,,no,,,
 `;
+
+const parseBoolCell = (value?: string): boolean | undefined => {
+  if (value === undefined) return undefined;
+  const v = value.trim().toLowerCase();
+  if (!v) return undefined;
+  if (['yes', 'y', 'true', '1', 'enable', 'enabled'].includes(v)) return true;
+  if (['no', 'n', 'false', '0', 'disable', 'disabled'].includes(v)) return false;
+  return undefined;
+};
 
 export interface CsvParseResult {
   rows: VlanRow[];
@@ -160,6 +171,8 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
     const name = cols[1] || '';
     const subnet = cols[2] || '';
     const isidRaw = cols[3];
+    const dhcpEnabled = parseBoolCell(cols[4]);
+    const dhcpServers = [cols[5], cols[6], cols[7]].map((c) => (c || '').trim()).filter(Boolean);
 
     if (!isValidVlanId(vlanId)) {
       errors.push(`Line ${lineNo}: invalid VLAN ID "${cols[0]}"`);
@@ -181,7 +194,20 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
       continue;
     }
 
-    rows.push({ vlanId, name: name || `VLAN-${vlanId}`, subnet, isid });
+    const badServer = dhcpServers.find((s) => !isValidIpv4(s));
+    if (badServer) {
+      errors.push(`Line ${lineNo}: invalid DHCP server address "${badServer}"`);
+      continue;
+    }
+
+    rows.push({
+      vlanId,
+      name: name || `VLAN-${vlanId}`,
+      subnet,
+      isid,
+      dhcpEnabled: dhcpEnabled ?? (dhcpServers.length > 0 ? true : undefined),
+      dhcpServers: dhcpServers.length > 0 ? dhcpServers.slice(0, 3) : undefined,
+    });
   }
 
   return { rows, errors };
@@ -249,8 +275,12 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       lines.push(`ip vrrp ${row.vlanId} priority ${priority}`);
       if (vrrp.backupMaster) lines.push(`ip vrrp ${row.vlanId} backup-master enable`);
       lines.push(`ip vrrp ${row.vlanId} enable`);
-      const dhcpServers = (vrrp.dhcpServers || []).map((s) => s.trim()).filter(isValidIpv4).slice(0, 3);
-      if (vrrp.dhcpEnabled && dhcpServers.length > 0) {
+      const rowDhcpEnabled = row.dhcpEnabled ?? vrrp.dhcpEnabled;
+      const dhcpServers = (row.dhcpServers && row.dhcpServers.length ? row.dhcpServers : vrrp.dhcpServers || [])
+        .map((s) => s.trim())
+        .filter(isValidIpv4)
+        .slice(0, 3);
+      if (rowDhcpEnabled && dhcpServers.length > 0) {
         lines.push('ip dhcp-relay');
         lines.push('exit');
         lines.push(`! DHCP relay forward paths for VLAN ${row.vlanId}`);
@@ -276,10 +306,23 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
 };
 
 export const rowsToCsv = (rows: VlanRow[], useFirstIps = true): string => {
-  const header = 'vlan_id,vlan_name,subnet,isid,gateway_vip,subnet_mask';
+  const header =
+    'vlan_id,vlan_name,subnet,isid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
   const body = rows.map((row) => {
     const addr = getSubnetAddressing(row.subnet, useFirstIps, 1);
-    return [row.vlanId, row.name, row.subnet, row.isid, addr.virtualIp, prefixToMask(addr.prefix)].join(',');
+    const servers = (row.dhcpServers || []).slice(0, 3);
+    return [
+      row.vlanId,
+      row.name,
+      row.subnet,
+      row.isid,
+      row.dhcpEnabled === undefined ? '' : row.dhcpEnabled ? 'yes' : 'no',
+      servers[0] || '',
+      servers[1] || '',
+      servers[2] || '',
+      addr.virtualIp,
+      prefixToMask(addr.prefix),
+    ].join(',');
   });
   return [header, ...body].join('\n');
 };
