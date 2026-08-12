@@ -249,6 +249,13 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       lines.push(`ip vrrp ${row.vlanId} priority ${priority}`);
       if (vrrp.backupMaster) lines.push(`ip vrrp ${row.vlanId} backup-master enable`);
       lines.push(`ip vrrp ${row.vlanId} enable`);
+      const dhcpServers = (vrrp.dhcpServers || []).map((s) => s.trim()).filter(isValidIpv4).slice(0, 3);
+      if (vrrp.dhcpEnabled && dhcpServers.length > 0) {
+        dhcpServers.forEach((server) => {
+          lines.push(`ip dhcp-relay fwd-path ${server} enable`);
+        });
+        lines.push('ip dhcp-relay');
+      }
       lines.push('exit');
       lines.push('');
     });
