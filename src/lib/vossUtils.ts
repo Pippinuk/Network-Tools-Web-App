@@ -9,11 +9,63 @@ export interface VlanRow {
   name: string;
   subnet: string;
   isid: number;
+  vrid?: number;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
 }
 
 export type IsidMode = 'offset' | 'prefix';
+
+export type VridMode = 'vlan' | 'fixed' | 'parity' | 'formula';
+
+export interface VridOptions {
+  mode: VridMode;
+  fixed: number;
+  oddVrid: number;
+  evenVrid: number;
+  formula: string;
+}
+
+export const defaultVridOptions: VridOptions = {
+  mode: 'vlan',
+  fixed: 1,
+  oddVrid: 1,
+  evenVrid: 2,
+  formula: '{id} % 255 + 1',
+};
+
+export const isValidVrid = (vrid: number): boolean =>
+  Number.isInteger(vrid) && vrid >= 1 && vrid <= 255;
+
+/** Evaluate a whitelisted arithmetic formula using {id} (VLAN ID) and {n} (sequence number, 1-based). */
+export const evaluateVridFormula = (formula: string, vlanId: number, index: number): number => {
+  const expr = formula
+    .replace(/\{\s*id\s*\}/gi, String(vlanId))
+    .replace(/\{\s*n\s*\}/gi, String(index + 1));
+  if (!/^[\d\s+\-*/%().]+$/.test(expr)) throw new Error('Formula may only use numbers, {id}, {n} and + - * / % ( )');
+  // eslint-disable-next-line no-new-func
+  const value = Function(`"use strict"; return (${expr});`)();
+  if (typeof value !== 'number' || !isFinite(value)) throw new Error('Formula did not produce a number');
+  return Math.floor(value);
+};
+
+export const computeVrid = (vlanId: number, index: number, opts: VridOptions): number => {
+  switch (opts.mode) {
+    case 'fixed':
+      return opts.fixed;
+    case 'parity':
+      return vlanId % 2 === 0 ? opts.evenVrid : opts.oddVrid;
+    case 'formula':
+      try {
+        return evaluateVridFormula(opts.formula, vlanId, index);
+      } catch {
+        return NaN;
+      }
+    case 'vlan':
+    default:
+      return ((vlanId - 1) % 255) + 1;
+  }
+};
 
 export interface IsidOptions {
   mode: IsidMode;
@@ -28,6 +80,7 @@ export interface VrrpOptions {
   backupMaster: boolean;
   memberPorts: string;
   mltId?: number;
+  vrid?: VridOptions;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
 }
@@ -130,10 +183,10 @@ export const prefixToMask = (prefix: number): string => {
   return [(mask >>> 24) & 255, (mask >>> 16) & 255, (mask >>> 8) & 255, mask & 255].join('.');
 };
 
-export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
-100,Data,10.10.100.0/24,10100,yes,10.1.1.10,10.1.1.11,
-101,Voice,10.10.101.0/24,10101,yes,10.1.1.10,,
-102,Wireless,10.10.102.0/24,,no,,,
+export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,vrid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
+100,Data,10.10.100.0/24,10100,1,yes,10.1.1.10,10.1.1.11,
+101,Voice,10.10.101.0/24,10101,2,yes,10.1.1.10,,
+102,Wireless,10.10.102.0/24,,,no,,,
 `;
 
 const parseBoolCell = (value?: string): boolean | undefined => {
@@ -171,8 +224,9 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
     const name = cols[1] || '';
     const subnet = cols[2] || '';
     const isidRaw = cols[3];
-    const dhcpEnabled = parseBoolCell(cols[4]);
-    const dhcpServers = [cols[5], cols[6], cols[7]].map((c) => (c || '').trim()).filter(Boolean);
+    const vridRaw = cols[4];
+    const dhcpEnabled = parseBoolCell(cols[5]);
+    const dhcpServers = [cols[6], cols[7], cols[8]].map((c) => (c || '').trim()).filter(Boolean);
 
     if (!isValidVlanId(vlanId)) {
       errors.push(`Line ${lineNo}: invalid VLAN ID "${cols[0]}"`);
@@ -194,6 +248,12 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
       continue;
     }
 
+    let vrid: number | undefined = vridRaw ? parseInt(vridRaw, 10) : undefined;
+    if (vrid !== undefined && !isValidVrid(vrid)) {
+      errors.push(`Line ${lineNo}: invalid VRRP instance ID "${vridRaw}" (1-255)`);
+      continue;
+    }
+
     const badServer = dhcpServers.find((s) => !isValidIpv4(s));
     if (badServer) {
       errors.push(`Line ${lineNo}: invalid DHCP server address "${badServer}"`);
@@ -205,6 +265,7 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
       name: name || `VLAN-${vlanId}`,
       subnet,
       isid,
+      vrid,
       dhcpEnabled: dhcpEnabled ?? (dhcpServers.length > 0 ? true : undefined),
       dhcpServers: dhcpServers.length > 0 ? dhcpServers.slice(0, 3) : undefined,
     });
@@ -223,6 +284,9 @@ export const validateRows = (rows: VlanRow[]): string[] => {
     if (isReservedVlanId(row.vlanId)) errors.push(`VLAN ${row.vlanId} is reserved by VOSS`);
     if (!isValidSubnet(row.subnet)) errors.push(`VLAN ${row.vlanId}: invalid subnet "${row.subnet}"`);
     if (!isValidIsid(row.isid)) errors.push(`VLAN ${row.vlanId}: invalid I-SID "${row.isid}"`);
+    if (row.vrid !== undefined && !isValidVrid(row.vrid)) {
+      errors.push(`VLAN ${row.vlanId}: VRRP instance ID must be between 1 and 255`);
+    }
     if (seenVlan.has(row.vlanId)) errors.push(`Duplicate VLAN ID ${row.vlanId}`);
     if (seenIsid.has(row.isid)) errors.push(`Duplicate I-SID ${row.isid}`);
     if (!/^[\w.-]{1,32}$/.test(row.name)) {
@@ -256,12 +320,13 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
     lines.push('router vrrp enable');
     lines.push('');
 
-    rows.forEach((row) => {
+    rows.forEach((row, rowIndex) => {
+      const vrid = row.vrid ?? computeVrid(row.vlanId, rowIndex, vrrp.vrid ?? defaultVridOptions);
       const addr = getSubnetAddressing(row.subnet, vrrp.useFirstIps, switchCount);
       const interfaceIp = addr.switchIps[s];
       const priority = Math.max(1, vrrp.priority - s * 20);
 
-      lines.push(`! --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} ---`);
+      lines.push(`! --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} ---`);
       lines.push(`vlan create ${row.vlanId} name "${row.name}" type port-mstprstp 0`);
       lines.push(`vlan i-sid ${row.vlanId} ${row.isid}`);
       if (vrrp.memberPorts.trim()) {
@@ -271,10 +336,10 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       lines.push(`interface vlan ${row.vlanId}`);
       lines.push(`ip address ${interfaceIp} ${prefixToMask(addr.prefix)}`);
       lines.push('ip vrrp version 3');
-      lines.push(`ip vrrp address ${row.vlanId} ${addr.virtualIp}`);
-      lines.push(`ip vrrp ${row.vlanId} priority ${priority}`);
-      if (vrrp.backupMaster) lines.push(`ip vrrp ${row.vlanId} backup-master enable`);
-      lines.push(`ip vrrp ${row.vlanId} enable`);
+      lines.push(`ip vrrp address ${vrid} ${addr.virtualIp}`);
+      lines.push(`ip vrrp ${vrid} priority ${priority}`);
+      if (vrrp.backupMaster) lines.push(`ip vrrp ${vrid} backup-master enable`);
+      lines.push(`ip vrrp ${vrid} enable`);
       const rowDhcpEnabled = row.dhcpEnabled ?? vrrp.dhcpEnabled;
       const dhcpServers = (row.dhcpServers && row.dhcpServers.length ? row.dhcpServers : vrrp.dhcpServers || [])
         .map((s) => s.trim())
@@ -307,7 +372,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
 
 export const rowsToCsv = (rows: VlanRow[], useFirstIps = true): string => {
   const header =
-    'vlan_id,vlan_name,subnet,isid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
+    'vlan_id,vlan_name,subnet,isid,vrid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
   const body = rows.map((row) => {
     const addr = getSubnetAddressing(row.subnet, useFirstIps, 1);
     const servers = (row.dhcpServers || []).slice(0, 3);
@@ -316,6 +381,7 @@ export const rowsToCsv = (rows: VlanRow[], useFirstIps = true): string => {
       row.name,
       row.subnet,
       row.isid,
+      row.vrid ?? '',
       row.dhcpEnabled === undefined ? '' : row.dhcpEnabled ? 'yes' : 'no',
       servers[0] || '',
       servers[1] || '',
