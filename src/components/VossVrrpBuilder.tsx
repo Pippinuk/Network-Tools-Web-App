@@ -23,6 +23,11 @@ import {
   CSV_TEMPLATE,
   IsidMode,
   IsidOptions,
+  VridMode,
+  VridOptions,
+  defaultVridOptions,
+  computeVrid,
+  isValidVrid,
   VlanRow,
   VrrpOptions,
   isValidIpv4,
@@ -42,6 +47,13 @@ import { downloadFile } from '@/lib/exportUtils';
 type Mode = 'auto' | 'manual' | 'csv';
 
 const defaultIsid: IsidOptions = { mode: 'offset', base: 10000, prefix: 1 };
+
+const vridModeLabels: Record<VridMode, string> = {
+  vlan: 'VLAN ID',
+  fixed: 'Fixed ID',
+  parity: 'Odd / even VLAN',
+  formula: 'Custom formula',
+};
 
 const defaultVrrp: VrrpOptions = {
   useFirstIps: true,
@@ -73,6 +85,7 @@ const VossVrrpBuilder: React.FC = () => {
   const [isid, setIsid] = useState<IsidOptions>(defaultIsid);
   const [vrrp, setVrrp] = useState<VrrpOptions>(defaultVrrp);
   const [mltId, setMltId] = useState('');
+  const [vrid, setVrid] = useState<VridOptions>(defaultVridOptions);
 
   // Import subnets handed over from the Subnet Slicer
   useEffect(() => {
@@ -119,12 +132,30 @@ const VossVrrpBuilder: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const errors = useMemo(() => validateRows(rows), [rows]);
+  const baseErrors = useMemo(() => validateRows(rows), [rows]);
 
   const options: VrrpOptions = useMemo(
-    () => ({ ...vrrp, mltId: mltId.trim() ? parseInt(mltId, 10) : undefined }),
-    [vrrp, mltId]
+    () => ({ ...vrrp, vrid, mltId: mltId.trim() ? parseInt(mltId, 10) : undefined }),
+    [vrrp, vrid, mltId]
   );
+
+  const effectiveVrids = useMemo(
+    () => rows.map((row, index) => row.vrid ?? computeVrid(row.vlanId, index, vrid)),
+    [rows, vrid]
+  );
+
+  const vridErrors = useMemo(() => {
+    const list: string[] = [];
+    rows.forEach((row, index) => {
+      const value = effectiveVrids[index];
+      if (!isValidVrid(value)) {
+        list.push(`VLAN ${row.vlanId}: VRRP instance ID "${isNaN(value) ? 'invalid formula' : value}" must be between 1 and 255`);
+      }
+    });
+    return Array.from(new Set(list));
+  }, [rows, effectiveVrids]);
+
+  const errors = useMemo(() => Array.from(new Set([...baseErrors, ...vridErrors])), [baseErrors, vridErrors]);
 
   const config = useMemo(
     () => (rows.length && errors.length === 0 ? generateVossVrrpConfig(rows, options) : ''),
@@ -278,8 +309,8 @@ const VossVrrpBuilder: React.FC = () => {
         <TabsContent value="csv" className="mt-6 space-y-4">
           <p className="text-sm text-muted-foreground">
             Upload a CSV with the columns{' '}
-            <span className="font-mono">vlan_id, vlan_name, subnet, isid, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
-            Leave the I-SID blank to auto-generate it. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
+            <span className="font-mono">vlan_id, vlan_name, subnet, isid, vrid, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
+            Leave the I-SID or VRRP instance ID (vrid) blank to auto-generate them. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
             to the DHCP relay settings below.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -409,6 +440,90 @@ const VossVrrpBuilder: React.FC = () => {
               <Input id="mltId" value={mltId} onChange={(e) => setMltId(e.target.value)} placeholder="e.g. 1" />
             </div>
           </div>
+
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <Label>VRRP instance ID (VRID) allocation</Label>
+            <div className="flex flex-wrap gap-2">
+              {(Object.keys(vridModeLabels) as VridMode[]).map((m) => (
+                <Button
+                  key={m}
+                  type="button"
+                  size="sm"
+                  variant={vrid.mode === m ? 'default' : 'outline'}
+                  onClick={() => setVrid({ ...vrid, mode: m })}
+                >
+                  {vridModeLabels[m]}
+                </Button>
+              ))}
+            </div>
+
+            {vrid.mode === 'vlan' && (
+              <p className="text-xs text-muted-foreground">
+                VRID follows the VLAN ID, wrapped into the valid 1-255 range (e.g. VLAN 100 → 100, VLAN 300 → 45).
+              </p>
+            )}
+
+            {vrid.mode === 'fixed' && (
+              <div className="space-y-2">
+                <Label htmlFor="vridFixed">VRRP instance ID</Label>
+                <Input
+                  id="vridFixed"
+                  type="number"
+                  min={1}
+                  max={255}
+                  value={vrid.fixed}
+                  onChange={(e) => setVrid({ ...vrid, fixed: parseInt(e.target.value, 10) || 1 })}
+                />
+                <p className="text-xs text-muted-foreground">The same VRID is used on every VLAN interface.</p>
+              </div>
+            )}
+
+            {vrid.mode === 'parity' && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="vridOdd">VRID for odd VLAN IDs</Label>
+                  <Input
+                    id="vridOdd"
+                    type="number"
+                    min={1}
+                    max={255}
+                    value={vrid.oddVrid}
+                    onChange={(e) => setVrid({ ...vrid, oddVrid: parseInt(e.target.value, 10) || 1 })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vridEven">VRID for even VLAN IDs</Label>
+                  <Input
+                    id="vridEven"
+                    type="number"
+                    min={1}
+                    max={255}
+                    value={vrid.evenVrid}
+                    onChange={(e) => setVrid({ ...vrid, evenVrid: parseInt(e.target.value, 10) || 1 })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {vrid.mode === 'formula' && (
+              <div className="space-y-2">
+                <Label htmlFor="vridFormula">VRID formula</Label>
+                <Input
+                  id="vridFormula"
+                  className="font-mono"
+                  value={vrid.formula}
+                  onChange={(e) => setVrid({ ...vrid, formula: e.target.value })}
+                  placeholder="{id} % 255 + 1"
+                />
+                <p className="text-xs text-muted-foreground">
+                  {'Use {id} for the VLAN ID and {n} for the row number, with + - * / % ( ). Examples: {id} % 100, ({id} - 100) / 2 + 1, {n}.'}
+                </p>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Any VRID typed directly in the table below overrides this rule for that VLAN.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <Switch
               id="useFirstIps"
@@ -492,6 +607,7 @@ const VossVrrpBuilder: React.FC = () => {
                   <TableHead>Name</TableHead>
                   <TableHead>Subnet (CIDR)</TableHead>
                   <TableHead className="w-32">I-SID</TableHead>
+                  <TableHead className="w-24">VRID</TableHead>
                   <TableHead>Gateway VIP</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -532,6 +648,20 @@ const VossVrrpBuilder: React.FC = () => {
                           className="h-8 w-28"
                           value={row.isid}
                           onChange={(e) => updateRow(index, { isid: parseInt(e.target.value, 10) || 0 })}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={255}
+                          className="h-8 w-20"
+                          value={row.vrid ?? ''}
+                          placeholder={String(effectiveVrids[index] ?? '')}
+                          onChange={(e) => {
+                            const raw = e.target.value.trim();
+                            updateRow(index, { vrid: raw === '' ? undefined : parseInt(raw, 10) });
+                          }}
                         />
                       </TableCell>
                       <TableCell className="font-mono text-sm">{vip}</TableCell>
