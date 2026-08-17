@@ -403,7 +403,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
     lines.push('');
   }
 
-  lines.push('! End of configuration');
+  lines.push('# End of configuration');
   return lines.join('\n');
 };
 
