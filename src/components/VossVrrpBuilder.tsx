@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import {
   CSV_TEMPLATE,
+  CSV_TEMPLATE_L2,
   IsidMode,
   IsidOptions,
   VridMode,
@@ -94,6 +95,7 @@ const VossVrrpBuilder: React.FC = () => {
   const [isid, setIsid] = useState<IsidOptions>(defaultIsid);
   const [vrrp, setVrrp] = useState<VrrpOptions>(defaultVrrp);
   const [mltId, setMltId] = useState('');
+  const [layer2Only, setLayer2Only] = useState(false);
   const [vrid, setVrid] = useState<VridOptions>(defaultVridOptions);
 
   // Import subnets handed over from the Subnet Slicer
@@ -141,7 +143,7 @@ const VossVrrpBuilder: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const baseErrors = useMemo(() => validateRows(rows), [rows]);
+  const baseErrors = useMemo(() => validateRows(rows, layer2Only), [rows, layer2Only]);
 
   const masterMode: MasterMode = vrrp.masterMode ?? 'first';
 
@@ -155,8 +157,8 @@ const VossVrrpBuilder: React.FC = () => {
   );
 
   const options: VrrpOptions = useMemo(
-    () => ({ ...vrrp, vrid, mltId: mltId.trim() ? parseInt(mltId, 10) : undefined }),
-    [vrrp, vrid, mltId]
+    () => ({ ...vrrp, vrid, layer2Only, mltId: mltId.trim() ? parseInt(mltId, 10) : undefined }),
+    [vrrp, vrid, mltId, layer2Only]
   );
 
   const effectiveVrids = useMemo(
@@ -166,6 +168,7 @@ const VossVrrpBuilder: React.FC = () => {
 
   const vridErrors = useMemo(() => {
     const list: string[] = [];
+    if (layer2Only) return list;
     rows.forEach((row, index) => {
       const value = effectiveVrids[index];
       if (!isValidVrid(value)) {
@@ -173,7 +176,7 @@ const VossVrrpBuilder: React.FC = () => {
       }
     });
     return Array.from(new Set(list));
-  }, [rows, effectiveVrids]);
+  }, [rows, effectiveVrids, layer2Only]);
 
   const errors = useMemo(() => Array.from(new Set([...baseErrors, ...vridErrors])), [baseErrors, vridErrors]);
 
@@ -194,14 +197,17 @@ const VossVrrpBuilder: React.FC = () => {
       const count = parseInt(vlanCount, 10);
       const start = parseInt(startVlan, 10);
 
-      if (!isValidSubnet(supernet)) throw new Error('Enter a valid supernet in CIDR notation');
-      if (isNaN(prefix) || prefix < 8 || prefix > 30) throw new Error('Subnet size must be between /8 and /30');
       if (isNaN(count) || count < 1 || count > 512) throw new Error('VLAN count must be between 1 and 512');
       if (isNaN(start) || start < 2 || start > 4094) throw new Error('Starting VLAN ID must be between 2 and 4094');
 
-      const subnets = splitSupernet(supernet, prefix, count);
-      if (subnets.length < count) {
-        throw new Error(`${supernet} only provides ${subnets.length} x /${prefix} subnets`);
+      let subnets: string[] = [];
+      if (!layer2Only) {
+        if (!isValidSubnet(supernet)) throw new Error('Enter a valid supernet in CIDR notation');
+        if (isNaN(prefix) || prefix < 8 || prefix > 30) throw new Error('Subnet size must be between /8 and /30');
+        subnets = splitSupernet(supernet, prefix, count);
+        if (subnets.length < count) {
+          throw new Error(`${supernet} only provides ${subnets.length} x /${prefix} subnets`);
+        }
       }
       const ids = buildVlanIdRange(start, count, parseNumberList(excluded));
       if (ids.length < count) throw new Error('Not enough usable VLAN IDs in range');
@@ -209,13 +215,13 @@ const VossVrrpBuilder: React.FC = () => {
       const next: VlanRow[] = ids.map((id, index) => ({
         vlanId: id,
         name: buildName(id, index),
-        subnet: subnets[index],
+        subnet: subnets[index] ?? '',
         isid: computeIsid(id, isid),
       }));
 
       setRows(next);
       setCsvErrors([]);
-      toast({ title: 'VLANs generated', description: `${next.length} VLANs with subnets and I-SIDs created.` });
+      toast({ title: 'VLANs generated', description: layer2Only ? `${next.length} VLANs with I-SIDs created (layer 2 only).` : `${next.length} VLANs with subnets and I-SIDs created.` });
     } catch (error) {
       toast({
         title: 'Unable to generate',
@@ -247,7 +253,7 @@ const VossVrrpBuilder: React.FC = () => {
 
   const handleCsv = async (file: File) => {
     const text = await file.text();
-    const result = parseVlanCsv(text, isid);
+    const result = parseVlanCsv(text, isid, layer2Only);
     setRows(result.rows);
     setCsvErrors(result.errors);
     toast({
@@ -259,7 +265,7 @@ const VossVrrpBuilder: React.FC = () => {
 
   const downloadConfig = () => {
     if (!config) return;
-    downloadFile(config, 'voss-vlan-isid-vrrp.cfg', 'text/plain');
+    downloadFile(config, layer2Only ? 'voss-vlan-isid.cfg' : 'voss-vlan-isid-vrrp.cfg', 'text/plain');
     toast({ title: 'Configuration downloaded' });
   };
 
@@ -271,6 +277,16 @@ const VossVrrpBuilder: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-4">
+        <div>
+          <Label htmlFor="layer2Only" className="text-base">Layer 2 only (VLAN + I-SID)</Label>
+          <p className="text-xs text-muted-foreground">
+            Create VLANs and assign I-SIDs with no IP interface, no subnets and no VRRP configuration.
+          </p>
+        </div>
+        <Switch id="layer2Only" checked={layer2Only} onCheckedChange={setLayer2Only} />
+      </div>
+
       <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="auto" className="gap-2">
@@ -286,14 +302,18 @@ const VossVrrpBuilder: React.FC = () => {
 
         <TabsContent value="auto" className="mt-6 space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="supernet">Supernet (CIDR)</Label>
-              <Input id="supernet" value={supernet} onChange={(e) => setSupernet(e.target.value)} placeholder="10.10.0.0/16" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="subnetPrefix">Subnet size (/prefix)</Label>
-              <Input id="subnetPrefix" type="number" min={8} max={30} value={subnetPrefix} onChange={(e) => setSubnetPrefix(e.target.value)} />
-            </div>
+            {!layer2Only && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="supernet">Supernet (CIDR)</Label>
+                  <Input id="supernet" value={supernet} onChange={(e) => setSupernet(e.target.value)} placeholder="10.10.0.0/16" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="subnetPrefix">Subnet size (/prefix)</Label>
+                  <Input id="subnetPrefix" type="number" min={8} max={30} value={subnetPrefix} onChange={(e) => setSubnetPrefix(e.target.value)} />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="vlanCount">Number of VLANs</Label>
               <Input id="vlanCount" type="number" min={1} max={512} value={vlanCount} onChange={(e) => setVlanCount(e.target.value)} />
@@ -313,13 +333,13 @@ const VossVrrpBuilder: React.FC = () => {
             </div>
           </div>
           <Button onClick={handleGenerate} className="gap-2">
-            <Sparkles className="size-4" /> Generate VLANs, subnets &amp; I-SIDs
+            <Sparkles className="size-4" /> {layer2Only ? 'Generate VLANs & I-SIDs' : 'Generate VLANs, subnets & I-SIDs'}
           </Button>
         </TabsContent>
 
         <TabsContent value="manual" className="mt-6 space-y-4">
           <p className="text-sm text-muted-foreground">
-            Add each VLAN with its own subnet. I-SIDs are filled automatically from the rules below and can be overridden per row.
+            {layer2Only ? 'Add each VLAN and its name. ' : 'Add each VLAN with its own subnet. '}I-SIDs are filled automatically from the rules below and can be overridden per row.
           </p>
           <Button variant="outline" onClick={handleAddRow} className="gap-2">
             <Plus className="size-4" /> Add VLAN
@@ -327,6 +347,12 @@ const VossVrrpBuilder: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="csv" className="mt-6 space-y-4">
+          {layer2Only ? (
+            <p className="text-sm text-muted-foreground">
+              Upload a CSV with the columns <span className="font-mono">vlan_id, vlan_name, isid</span>. Leave the I-SID blank to
+              auto-generate it. Subnet, VRRP and DHCP columns are ignored in layer 2 only mode.
+            </p>
+          ) : (
           <p className="text-sm text-muted-foreground">
             Upload a CSV with the columns{' '}
             <span className="font-mono">vlan_id, vlan_name, subnet, isid, vrid, master_switch, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
@@ -334,6 +360,7 @@ const VossVrrpBuilder: React.FC = () => {
             switch number (1, 2, ...) that should be VRRP master for that VLAN — blank follows the master distribution rule below. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
             to the DHCP relay settings below.
           </p>
+          )}
           <div className="flex flex-wrap gap-2">
             <input
               ref={fileRef}
@@ -351,7 +378,13 @@ const VossVrrpBuilder: React.FC = () => {
             </Button>
             <Button
               variant="outline"
-              onClick={() => downloadFile(CSV_TEMPLATE, 'voss-vlan-template.csv', 'text/csv')}
+              onClick={() =>
+                downloadFile(
+                  layer2Only ? CSV_TEMPLATE_L2 : CSV_TEMPLATE,
+                  layer2Only ? 'voss-vlan-l2-template.csv' : 'voss-vlan-template.csv',
+                  'text/csv'
+                )
+              }
               className="gap-2"
             >
               <FileSpreadsheet className="size-4" /> Download template
@@ -423,8 +456,10 @@ const VossVrrpBuilder: React.FC = () => {
         </div>
 
         <div className="space-y-4 rounded-lg border border-border p-4">
-          <h4 className="font-medium">VRRP &amp; interface options</h4>
+          <h4 className="font-medium">{layer2Only ? 'VLAN options' : 'VRRP & interface options'}</h4>
           <div className="grid gap-4 sm:grid-cols-2">
+            {!layer2Only && (
+              <>
             <div className="space-y-2">
               <Label htmlFor="switchCount">Switches in cluster</Label>
               <Input
@@ -447,6 +482,8 @@ const VossVrrpBuilder: React.FC = () => {
                 onChange={(e) => setVrrp({ ...vrrp, priority: parseInt(e.target.value, 10) || 100 })}
               />
             </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="memberPorts">VLAN member ports (optional)</Label>
               <Input
@@ -462,6 +499,8 @@ const VossVrrpBuilder: React.FC = () => {
             </div>
           </div>
 
+          {!layer2Only && (
+            <>
           <div className="space-y-3 rounded-md border border-border p-3">
             <Label>VRRP instance ID (VRID) allocation</Label>
             <div className="flex flex-wrap gap-2">
@@ -628,6 +667,8 @@ const VossVrrpBuilder: React.FC = () => {
               })}
             </div>
           )}
+            </>
+          )}
         </div>
       </div>
 
@@ -642,7 +683,9 @@ const VossVrrpBuilder: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => downloadFile(rowsToCsv(rows, vrrp.useFirstIps), 'voss-vlan-plan.csv', 'text/csv')}
+                onClick={() =>
+                  downloadFile(rowsToCsv(rows, vrrp.useFirstIps, layer2Only), 'voss-vlan-plan.csv', 'text/csv')
+                }
                 className="gap-2"
               >
                 <FileSpreadsheet className="size-4" /> Export CSV
@@ -659,11 +702,15 @@ const VossVrrpBuilder: React.FC = () => {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-24">VLAN ID</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Subnet (CIDR)</TableHead>
+                  {!layer2Only && <TableHead>Subnet (CIDR)</TableHead>}
                   <TableHead className="w-32">I-SID</TableHead>
-                  <TableHead className="w-24">VRID</TableHead>
-                  <TableHead className="w-40">VRRP master</TableHead>
-                  <TableHead>Gateway VIP</TableHead>
+                  {!layer2Only && (
+                    <>
+                      <TableHead className="w-24">VRID</TableHead>
+                      <TableHead className="w-40">VRRP master</TableHead>
+                      <TableHead>Gateway VIP</TableHead>
+                    </>
+                  )}
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -689,14 +736,16 @@ const VossVrrpBuilder: React.FC = () => {
                           onChange={(e) => updateRow(index, { name: e.target.value })}
                         />
                       </TableCell>
-                      <TableCell>
-                        <Input
-                          className="h-8 font-mono"
-                          value={row.subnet}
-                          placeholder="10.10.100.0/24"
-                          onChange={(e) => updateRow(index, { subnet: e.target.value })}
-                        />
-                      </TableCell>
+                      {!layer2Only && (
+                        <TableCell>
+                          <Input
+                            className="h-8 font-mono"
+                            value={row.subnet}
+                            placeholder="10.10.100.0/24"
+                            onChange={(e) => updateRow(index, { subnet: e.target.value })}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Input
                           type="number"
@@ -705,6 +754,8 @@ const VossVrrpBuilder: React.FC = () => {
                           onChange={(e) => updateRow(index, { isid: parseInt(e.target.value, 10) || 0 })}
                         />
                       </TableCell>
+                      {!layer2Only && (
+                      <>
                       <TableCell>
                         <Input
                           type="number"
@@ -738,6 +789,8 @@ const VossVrrpBuilder: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">{vip}</TableCell>
+                      </>
+                      )}
                       <TableCell>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => removeRow(index)}>
                           <Trash2 className="size-4" />

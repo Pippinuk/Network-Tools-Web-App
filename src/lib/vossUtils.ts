@@ -107,6 +107,7 @@ export interface VrrpOptions {
   mltId?: number;
   vrid?: VridOptions;
   masterMode?: MasterMode;
+  layer2Only?: boolean;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
 }
@@ -209,6 +210,12 @@ export const prefixToMask = (prefix: number): string => {
   return [(mask >>> 24) & 255, (mask >>> 16) & 255, (mask >>> 8) & 255, mask & 255].join('.');
 };
 
+export const CSV_TEMPLATE_L2 = `vlan_id,vlan_name,isid
+100,Data,10100
+101,Voice,10101
+102,Wireless,
+`;
+
 export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
 100,Data,10.10.100.0/24,10100,1,1,yes,10.1.1.10,10.1.1.11,
 101,Voice,10.10.101.0/24,10101,2,2,yes,10.1.1.10,,
@@ -229,7 +236,11 @@ export interface CsvParseResult {
   errors: string[];
 }
 
-export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseResult => {
+export const parseVlanCsv = (
+  text: string,
+  isidOptions: IsidOptions,
+  layer2Only = false
+): CsvParseResult => {
   const errors: string[] = [];
   const rows: VlanRow[] = [];
 
@@ -249,7 +260,7 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
     const vlanId = parseInt(cols[0], 10);
     const name = cols[1] || '';
     const subnet = cols[2] || '';
-    const isidRaw = cols[3];
+    const isidRaw = layer2Only && cols.length <= 3 ? cols[2] : cols[3];
     const vridRaw = cols[4];
     const masterRaw = cols[5];
     const dhcpEnabled = parseBoolCell(cols[6]);
@@ -263,7 +274,7 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
       errors.push(`Line ${lineNo}: VLAN ${vlanId} is reserved by VOSS`);
       continue;
     }
-    if (!isValidSubnet(subnet)) {
+    if (!layer2Only && !isValidSubnet(subnet)) {
       errors.push(`Line ${lineNo}: invalid subnet "${subnet}"`);
       continue;
     }
@@ -296,7 +307,7 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
     rows.push({
       vlanId,
       name: name || `VLAN-${vlanId}`,
-      subnet,
+      subnet: layer2Only && !isValidSubnet(subnet) ? '' : subnet,
       isid,
       vrid,
       masterSwitch,
@@ -308,7 +319,7 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
   return { rows, errors };
 };
 
-export const validateRows = (rows: VlanRow[]): string[] => {
+export const validateRows = (rows: VlanRow[], layer2Only = false): string[] => {
   const errors: string[] = [];
   const seenVlan = new Set<number>();
   const seenIsid = new Set<number>();
@@ -316,7 +327,7 @@ export const validateRows = (rows: VlanRow[]): string[] => {
   rows.forEach((row) => {
     if (!isValidVlanId(row.vlanId)) errors.push(`VLAN ${row.vlanId} is out of range (2-4094)`);
     if (isReservedVlanId(row.vlanId)) errors.push(`VLAN ${row.vlanId} is reserved by VOSS`);
-    if (!isValidSubnet(row.subnet)) errors.push(`VLAN ${row.vlanId}: invalid subnet "${row.subnet}"`);
+    if (!layer2Only && !isValidSubnet(row.subnet)) errors.push(`VLAN ${row.vlanId}: invalid subnet "${row.subnet}"`);
     if (!isValidIsid(row.isid)) errors.push(`VLAN ${row.vlanId}: invalid I-SID "${row.isid}"`);
     if (row.vrid !== undefined && !isValidVrid(row.vrid)) {
       errors.push(`VLAN ${row.vlanId}: VRRP instance ID must be between 1 and 255`);
@@ -333,7 +344,38 @@ export const validateRows = (rows: VlanRow[]): string[] => {
   return Array.from(new Set(errors));
 };
 
+export const generateVossL2Config = (rows: VlanRow[], vrrp: VrrpOptions): string => {
+  const lines: string[] = [];
+  lines.push('# ------------------------------------------------------------');
+  lines.push('# Extreme Networks VOSS - Layer 2 VLAN / I-SID configuration');
+  lines.push(`# Generated: ${new Date().toISOString()}`);
+  lines.push(`# VLANs: ${rows.length}   (no IP interfaces, no VRRP)`);
+  lines.push('# ------------------------------------------------------------');
+  lines.push('');
+  lines.push('enable');
+  lines.push('configure terminal');
+  lines.push('');
+
+  rows.forEach((row) => {
+    lines.push(`# --- VLAN ${row.vlanId} (${row.name}) - I-SID ${row.isid} ---`);
+    lines.push(`vlan create ${row.vlanId} name "${row.name}" type port-mstprstp 0`);
+    lines.push(`vlan i-sid ${row.vlanId} ${row.isid}`);
+    if (vrrp.memberPorts.trim()) {
+      lines.push(`vlan members add ${row.vlanId} ${vrrp.memberPorts.trim()} portmember`);
+    }
+    if (vrrp.mltId) lines.push(`vlan mlt ${row.vlanId} ${vrrp.mltId}`);
+    lines.push('');
+  });
+
+  lines.push('end');
+  lines.push('save config');
+  lines.push('');
+  lines.push('# End of configuration');
+  return lines.join('\n');
+};
+
 export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): string => {
+  if (vrrp.layer2Only) return generateVossL2Config(rows, vrrp);
   const lines: string[] = [];
   const switchCount = Math.max(1, vrrp.switchCount);
 
@@ -407,7 +449,10 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
   return lines.join('\n');
 };
 
-export const rowsToCsv = (rows: VlanRow[], useFirstIps = true): string => {
+export const rowsToCsv = (rows: VlanRow[], useFirstIps = true, layer2Only = false): string => {
+  if (layer2Only) {
+    return ['vlan_id,vlan_name,isid', ...rows.map((r) => [r.vlanId, r.name, r.isid].join(','))].join('\n');
+  }
   const header =
     'vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
   const body = rows.map((row) => {
