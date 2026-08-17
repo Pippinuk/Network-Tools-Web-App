@@ -337,17 +337,17 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
   const lines: string[] = [];
   const switchCount = Math.max(1, vrrp.switchCount);
 
-  lines.push('! ------------------------------------------------------------');
-  lines.push('! Extreme Networks VOSS - VLAN / I-SID / VRRP configuration');
-  lines.push(`! Generated: ${new Date().toISOString()}`);
-  lines.push(`! VLANs: ${rows.length}   Switches in cluster: ${switchCount}`);
-  lines.push('! ------------------------------------------------------------');
+  lines.push('# ------------------------------------------------------------');
+  lines.push('# Extreme Networks VOSS - VLAN / I-SID / VRRP configuration');
+  lines.push(`# Generated: ${new Date().toISOString()}`);
+  lines.push(`# VLANs: ${rows.length}   Switches in cluster: ${switchCount}`);
+  lines.push('# ------------------------------------------------------------');
   lines.push('');
 
   for (let s = 0; s < switchCount; s++) {
-    lines.push('! ============================================================');
-    lines.push(`! SWITCH ${s + 1} of ${switchCount}`);
-    lines.push('! ============================================================');
+    lines.push('# ============================================================');
+    lines.push(`# SWITCH ${s + 1} of ${switchCount}`);
+    lines.push('# ============================================================');
     lines.push('enable');
     lines.push('configure terminal');
     lines.push('');
@@ -363,7 +363,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       const distance = (s - masterIndex + switchCount) % switchCount;
       const priority = Math.max(1, vrrp.priority - distance * 20);
 
-      lines.push(`! --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
+      lines.push(`# --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
       lines.push(`vlan create ${row.vlanId} name "${row.name}" type port-mstprstp 0`);
       lines.push(`vlan i-sid ${row.vlanId} ${row.isid}`);
       if (vrrp.memberPorts.trim()) {
@@ -385,7 +385,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       if (rowDhcpEnabled && dhcpServers.length > 0) {
         lines.push('ip dhcp-relay');
         lines.push('exit');
-        lines.push(`! DHCP relay forward paths for VLAN ${row.vlanId}`);
+        lines.push(`# DHCP relay forward paths for VLAN ${row.vlanId}`);
         dhcpServers.forEach((server) => {
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server}`);
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server} enable`);
@@ -403,7 +403,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
     lines.push('');
   }
 
-  lines.push('! End of configuration');
+  lines.push('# End of configuration');
   return lines.join('\n');
 };
 
