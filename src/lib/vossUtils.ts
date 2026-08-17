@@ -337,11 +337,11 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
   const lines: string[] = [];
   const switchCount = Math.max(1, vrrp.switchCount);
 
-  lines.push('! ------------------------------------------------------------');
-  lines.push('! Extreme Networks VOSS - VLAN / I-SID / VRRP configuration');
-  lines.push(`! Generated: ${new Date().toISOString()}`);
-  lines.push(`! VLANs: ${rows.length}   Switches in cluster: ${switchCount}`);
-  lines.push('! ------------------------------------------------------------');
+  lines.push('# ------------------------------------------------------------');
+  lines.push('# Extreme Networks VOSS - VLAN / I-SID / VRRP configuration');
+  lines.push(`# Generated: ${new Date().toISOString()}`);
+  lines.push(`# VLANs: ${rows.length}   Switches in cluster: ${switchCount}`);
+  lines.push('# ------------------------------------------------------------');
   lines.push('');
 
   for (let s = 0; s < switchCount; s++) {
