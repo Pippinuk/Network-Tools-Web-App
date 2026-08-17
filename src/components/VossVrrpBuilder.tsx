@@ -62,7 +62,7 @@ const defaultVrrp: VrrpOptions = {
   switchCount: 2,
   priority: 200,
   backupMaster: true,
-  memberPorts: '1/1-1/48',
+  memberPorts: '',
   dhcpEnabled: false,
   dhcpServers: ['', '', ''],
   masterMode: 'first',
