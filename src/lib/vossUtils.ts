@@ -363,7 +363,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       const distance = (s - masterIndex + switchCount) % switchCount;
       const priority = Math.max(1, vrrp.priority - distance * 20);
 
-      lines.push(`! --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
+      lines.push(`# --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
       lines.push(`vlan create ${row.vlanId} name "${row.name}" type port-mstprstp 0`);
       lines.push(`vlan i-sid ${row.vlanId} ${row.isid}`);
       if (vrrp.memberPorts.trim()) {
