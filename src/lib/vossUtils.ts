@@ -345,9 +345,9 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
   lines.push('');
 
   for (let s = 0; s < switchCount; s++) {
-    lines.push('! ============================================================');
-    lines.push(`! SWITCH ${s + 1} of ${switchCount}`);
-    lines.push('! ============================================================');
+    lines.push('# ============================================================');
+    lines.push(`# SWITCH ${s + 1} of ${switchCount}`);
+    lines.push('# ============================================================');
     lines.push('enable');
     lines.push('configure terminal');
     lines.push('');
