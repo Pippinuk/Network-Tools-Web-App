@@ -10,6 +10,7 @@ export interface VlanRow {
   subnet: string;
   isid: number;
   vrid?: number;
+  masterSwitch?: number;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
 }
@@ -67,6 +68,30 @@ export const computeVrid = (vlanId: number, index: number, opts: VridOptions): n
   }
 };
 
+export type MasterMode = 'first' | 'alternate' | 'parity';
+
+/** Which switch (1-based) should be the VRRP master for a given VLAN. */
+export const computeMasterSwitch = (
+  vlanId: number,
+  index: number,
+  switchCount: number,
+  mode: MasterMode
+): number => {
+  const count = Math.max(1, switchCount);
+  switch (mode) {
+    case 'alternate':
+      return (index % count) + 1;
+    case 'parity':
+      return (vlanId % 2 === 0 ? 1 : Math.min(2, count)) as number;
+    case 'first':
+    default:
+      return 1;
+  }
+};
+
+export const isValidMasterSwitch = (value: number, switchCount: number): boolean =>
+  Number.isInteger(value) && value >= 1 && value <= Math.max(1, switchCount);
+
 export interface IsidOptions {
   mode: IsidMode;
   base: number;
@@ -81,6 +106,7 @@ export interface VrrpOptions {
   memberPorts: string;
   mltId?: number;
   vrid?: VridOptions;
+  masterMode?: MasterMode;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
 }
@@ -183,10 +209,10 @@ export const prefixToMask = (prefix: number): string => {
   return [(mask >>> 24) & 255, (mask >>> 16) & 255, (mask >>> 8) & 255, mask & 255].join('.');
 };
 
-export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,vrid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
-100,Data,10.10.100.0/24,10100,1,yes,10.1.1.10,10.1.1.11,
-101,Voice,10.10.101.0/24,10101,2,yes,10.1.1.10,,
-102,Wireless,10.10.102.0/24,,,no,,,
+export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
+100,Data,10.10.100.0/24,10100,1,1,yes,10.1.1.10,10.1.1.11,
+101,Voice,10.10.101.0/24,10101,2,2,yes,10.1.1.10,,
+102,Wireless,10.10.102.0/24,,,,no,,,
 `;
 
 const parseBoolCell = (value?: string): boolean | undefined => {
@@ -225,8 +251,9 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
     const subnet = cols[2] || '';
     const isidRaw = cols[3];
     const vridRaw = cols[4];
-    const dhcpEnabled = parseBoolCell(cols[5]);
-    const dhcpServers = [cols[6], cols[7], cols[8]].map((c) => (c || '').trim()).filter(Boolean);
+    const masterRaw = cols[5];
+    const dhcpEnabled = parseBoolCell(cols[6]);
+    const dhcpServers = [cols[7], cols[8], cols[9]].map((c) => (c || '').trim()).filter(Boolean);
 
     if (!isValidVlanId(vlanId)) {
       errors.push(`Line ${lineNo}: invalid VLAN ID "${cols[0]}"`);
@@ -254,6 +281,12 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
       continue;
     }
 
+    let masterSwitch: number | undefined = masterRaw ? parseInt(masterRaw, 10) : undefined;
+    if (masterSwitch !== undefined && (!Number.isInteger(masterSwitch) || masterSwitch < 1 || masterSwitch > 8)) {
+      errors.push(`Line ${lineNo}: invalid VRRP master switch "${masterRaw}"`);
+      continue;
+    }
+
     const badServer = dhcpServers.find((s) => !isValidIpv4(s));
     if (badServer) {
       errors.push(`Line ${lineNo}: invalid DHCP server address "${badServer}"`);
@@ -266,6 +299,7 @@ export const parseVlanCsv = (text: string, isidOptions: IsidOptions): CsvParseRe
       subnet,
       isid,
       vrid,
+      masterSwitch,
       dhcpEnabled: dhcpEnabled ?? (dhcpServers.length > 0 ? true : undefined),
       dhcpServers: dhcpServers.length > 0 ? dhcpServers.slice(0, 3) : undefined,
     });
@@ -324,9 +358,12 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       const vrid = row.vrid ?? computeVrid(row.vlanId, rowIndex, vrrp.vrid ?? defaultVridOptions);
       const addr = getSubnetAddressing(row.subnet, vrrp.useFirstIps, switchCount);
       const interfaceIp = addr.switchIps[s];
-      const priority = Math.max(1, vrrp.priority - s * 20);
+      const master = row.masterSwitch ?? computeMasterSwitch(row.vlanId, rowIndex, switchCount, vrrp.masterMode ?? 'first');
+      const masterIndex = Math.min(Math.max(master, 1), switchCount) - 1;
+      const distance = (s - masterIndex + switchCount) % switchCount;
+      const priority = Math.max(1, vrrp.priority - distance * 20);
 
-      lines.push(`! --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} ---`);
+      lines.push(`! --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
       lines.push(`vlan create ${row.vlanId} name "${row.name}" type port-mstprstp 0`);
       lines.push(`vlan i-sid ${row.vlanId} ${row.isid}`);
       if (vrrp.memberPorts.trim()) {
@@ -372,7 +409,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
 
 export const rowsToCsv = (rows: VlanRow[], useFirstIps = true): string => {
   const header =
-    'vlan_id,vlan_name,subnet,isid,vrid,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
+    'vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
   const body = rows.map((row) => {
     const addr = getSubnetAddressing(row.subnet, useFirstIps, 1);
     const servers = (row.dhcpServers || []).slice(0, 3);
@@ -382,6 +419,7 @@ export const rowsToCsv = (rows: VlanRow[], useFirstIps = true): string => {
       row.subnet,
       row.isid,
       row.vrid ?? '',
+      row.masterSwitch ?? '',
       row.dhcpEnabled === undefined ? '' : row.dhcpEnabled ? 'yes' : 'no',
       servers[0] || '',
       servers[1] || '',

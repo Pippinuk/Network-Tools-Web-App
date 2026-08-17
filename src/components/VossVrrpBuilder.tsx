@@ -25,6 +25,8 @@ import {
   IsidOptions,
   VridMode,
   VridOptions,
+  MasterMode,
+  computeMasterSwitch,
   defaultVridOptions,
   computeVrid,
   isValidVrid,
@@ -63,6 +65,13 @@ const defaultVrrp: VrrpOptions = {
   memberPorts: '1/1-1/48',
   dhcpEnabled: false,
   dhcpServers: ['', '', ''],
+  masterMode: 'first',
+};
+
+const masterModeLabels: Record<MasterMode, string> = {
+  alternate: 'Round-robin per VLAN',
+  parity: 'Odd / even VLAN ID',
+  first: 'All on switch 1',
 };
 
 const VossVrrpBuilder: React.FC = () => {
@@ -133,6 +142,17 @@ const VossVrrpBuilder: React.FC = () => {
   }, []);
 
   const baseErrors = useMemo(() => validateRows(rows), [rows]);
+
+  const masterMode: MasterMode = vrrp.masterMode ?? 'first';
+
+  const effectiveMasters = useMemo(
+    () =>
+      rows.map(
+        (row, index) =>
+          row.masterSwitch ?? computeMasterSwitch(row.vlanId, index, vrrp.switchCount, masterMode)
+      ),
+    [rows, vrrp.switchCount, masterMode]
+  );
 
   const options: VrrpOptions = useMemo(
     () => ({ ...vrrp, vrid, mltId: mltId.trim() ? parseInt(mltId, 10) : undefined }),
@@ -309,8 +329,9 @@ const VossVrrpBuilder: React.FC = () => {
         <TabsContent value="csv" className="mt-6 space-y-4">
           <p className="text-sm text-muted-foreground">
             Upload a CSV with the columns{' '}
-            <span className="font-mono">vlan_id, vlan_name, subnet, isid, vrid, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
-            Leave the I-SID or VRRP instance ID (vrid) blank to auto-generate them. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
+            <span className="font-mono">vlan_id, vlan_name, subnet, isid, vrid, master_switch, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
+            Leave the I-SID or VRRP instance ID (vrid) blank to auto-generate them. Set <span className="font-mono">master_switch</span> to the
+            switch number (1, 2, ...) that should be VRRP master for that VLAN — blank follows the master distribution rule below. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
             to the DHCP relay settings below.
           </p>
           <div className="flex flex-wrap gap-2">
@@ -524,6 +545,39 @@ const VossVrrpBuilder: React.FC = () => {
               Any VRID typed directly in the table below overrides this rule for that VLAN.
             </p>
           </div>
+          <div className="space-y-3 rounded-md border border-border p-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="distributeMaster"
+                checked={masterMode !== 'first'}
+                disabled={vrrp.switchCount < 2}
+                onCheckedChange={(checked) => setVrrp({ ...vrrp, masterMode: checked ? 'alternate' : 'first' })}
+              />
+              <Label htmlFor="distributeMaster">Split the VRRP master across switches</Label>
+            </div>
+            {vrrp.switchCount < 2 && (
+              <p className="text-xs text-muted-foreground">Add a second switch to the cluster to balance VRRP masters.</p>
+            )}
+            {masterMode !== 'first' && vrrp.switchCount > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {(['alternate', 'parity'] as MasterMode[]).map((m) => (
+                  <Button
+                    key={m}
+                    type="button"
+                    size="sm"
+                    variant={masterMode === m ? 'default' : 'outline'}
+                    onClick={() => setVrrp({ ...vrrp, masterMode: m })}
+                  >
+                    {masterModeLabels[m]}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              The master switch keeps the full priority ({vrrp.priority}); the other switches drop 20 per step. Pick a master per VLAN in
+              the table below to override this rule.
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <Switch
               id="useFirstIps"
@@ -608,6 +662,7 @@ const VossVrrpBuilder: React.FC = () => {
                   <TableHead>Subnet (CIDR)</TableHead>
                   <TableHead className="w-32">I-SID</TableHead>
                   <TableHead className="w-24">VRID</TableHead>
+                  <TableHead className="w-40">VRRP master</TableHead>
                   <TableHead>Gateway VIP</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
@@ -663,6 +718,24 @@ const VossVrrpBuilder: React.FC = () => {
                             updateRow(index, { vrid: raw === '' ? undefined : parseInt(raw, 10) });
                           }}
                         />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.from({ length: Math.max(1, vrrp.switchCount) }, (_, i) => i + 1).map((sw) => (
+                            <Button
+                              key={sw}
+                              type="button"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              variant={effectiveMasters[index] === sw ? 'default' : 'outline'}
+                              onClick={() =>
+                                updateRow(index, { masterSwitch: row.masterSwitch === sw ? undefined : sw })
+                              }
+                            >
+                              {sw}
+                            </Button>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">{vip}</TableCell>
                       <TableCell>
