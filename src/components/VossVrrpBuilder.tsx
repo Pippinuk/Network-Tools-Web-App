@@ -755,6 +755,7 @@ const VossVrrpBuilder: React.FC = () => {
                         />
                       </TableCell>
                       {!layer2Only && (
+                      <>
                       <TableCell>
                         <Input
                           type="number"
