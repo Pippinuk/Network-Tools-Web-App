@@ -385,7 +385,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       if (rowDhcpEnabled && dhcpServers.length > 0) {
         lines.push('ip dhcp-relay');
         lines.push('exit');
-        lines.push(`! DHCP relay forward paths for VLAN ${row.vlanId}`);
+        lines.push(`# DHCP relay forward paths for VLAN ${row.vlanId}`);
         dhcpServers.forEach((server) => {
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server}`);
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server} enable`);
