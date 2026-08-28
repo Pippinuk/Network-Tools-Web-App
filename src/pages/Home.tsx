@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Logo from '@/components/Logo';
 import Navigation from '@/components/Navigation';
-import { Network, Server, ArrowRight, Layers } from 'lucide-react';
+import { Network, Server, ArrowRight, Layers, Shield } from 'lucide-react';
 
 const Home = () => {
   const navigate = useNavigate();
@@ -25,6 +25,14 @@ const Home = () => {
       icon: Server,
       path: '/voss',
       color: 'bg-emerald-500/10 text-emerald-600',
+    },
+    {
+      id: 'panos',
+      title: 'PAN-OS Security Policies',
+      description: 'Upload a CSV of App-ID based rules and generate Panorama or firewall API commands.',
+      icon: Shield,
+      path: '/panos',
+      color: 'bg-orange-500/10 text-orange-600',
     },
   ];
 

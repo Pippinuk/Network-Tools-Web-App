@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Home, Menu, Network, Server } from 'lucide-react';
+import { Home, Menu, Network, Server, Shield } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -58,6 +58,14 @@ const Navigation = () => {
             >
               <Server className="size-5" />
               <span>VOSS VLAN / I-SID / VRRP</span>
+            </Link>
+            <Link
+              to="/panos"
+              className="flex items-center gap-3 rounded-md p-3 text-sm font-medium hover:bg-accent"
+              onClick={() => setOpen(false)}
+            >
+              <Shield className="size-5" />
+              <span>PAN-OS Security Policies</span>
             </Link>
           </div>
         </SheetContent>
