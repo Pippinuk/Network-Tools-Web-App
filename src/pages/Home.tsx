@@ -29,7 +29,7 @@ const Home = () => {
     {
       id: 'panos',
       title: 'PAN-OS Security Policies',
-      description: 'Upload a CSV of App-ID based rules and generate Panorama or firewall API commands.',
+      description: 'Upload a CSV of App-ID based rules and generate Panorama or firewall API, XML, REST, or Terraform commands.',
       icon: Shield,
       path: '/panos',
       color: 'bg-orange-500/10 text-orange-600',
@@ -57,7 +57,8 @@ const Home = () => {
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
               A simple, fast collection of utilities for network engineers. Slice subnets, plan VLANs,
-              and generate Extreme Networks VOSS configuration — all from your browser.
+              generate Extreme Networks VOSS configuration, and build Palo Alto PAN-OS security policy
+              rules — including Terraform output — all from your browser.
             </p>
           </div>
         </section>
