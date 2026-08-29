@@ -80,6 +80,11 @@ const PanosPolicyBuilder: React.FC = () => {
     [rules, usePanorama, host, deviceGroup, postRulebase, vsys, apiVersion]
   );
   const bulkXml = useMemo(() => (rules.length ? generateBulkXml(rules) : ''), [rules]);
+  const terraform = useMemo(
+    () => (rules.length ? generateTerraform(rules, options, placement) : ''),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rules, usePanorama, host, deviceGroup, postRulebase, vsys, placementEnabled, placementMode, afterRule]
+  );
 
   const handleTemplate = () => {
     downloadFile(generatePanosCsvTemplate(), 'panos-security-rules-template.csv', 'text/csv');
