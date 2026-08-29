@@ -239,7 +239,7 @@ const Index = () => {
         <Separator className="mb-6" />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-muted-foreground text-sm">
           <Logo iconClassName="size-4" textClassName="text-base" />
-          <p>© {new Date().getFullYear()} NetworkTools. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} SwitchCraft. All rights reserved.</p>
         </div>
       </footer>
     </div>

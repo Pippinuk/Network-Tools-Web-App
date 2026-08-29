@@ -1,9 +1,9 @@
 {
-  "name": "network-tools-web-app",
+  "name": "switchcraft",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://Pippinuk.github.io/network-tools-web-app",
+  "homepage": "https://Pippinuk.github.io/switchcraft",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

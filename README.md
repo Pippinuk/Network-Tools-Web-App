@@ -1,4 +1,4 @@
-# Network Tools Web App
+# SwitchCraft
 
 ## Project info
 
@@ -69,7 +69,7 @@ Simply open [Lovable](https://lovable.dev/projects/6b6a5d95-00c2-4822-887a-068fd
 This project is configured to deploy to GitHub Pages at:
 
 ```
-https://Pippinuk.github.io/Network-Tools-Web-App
+https://Pippinuk.github.io/switchcraft
 ```
 
 ### Option 1: Automatic deployment with GitHub Actions

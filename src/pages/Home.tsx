@@ -50,13 +50,13 @@ const Home = () => {
           <div className="max-w-3xl mx-auto space-y-5 py-12">
             <div className="inline-flex items-center bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium">
               <Layers className="size-4 mr-2" />
-              Network Engineering Toolkit
+              SwitchCraft Network Toolkit
             </div>
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-              Welcome to NetworkTools
+              Welcome to SwitchCraft
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              A simple, fast collection of utilities for network engineers. Slice subnets, plan VLANs,
+              SwitchCraft is a simple, fast collection of utilities for network engineers. Slice subnets, plan VLANs,
               generate Extreme Networks VOSS configuration, and build Palo Alto PAN-OS security policy
               rules — including Terraform output — all from your browser.
             </p>
@@ -109,7 +109,7 @@ const Home = () => {
         <Separator className="mb-6" />
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-muted-foreground text-sm">
           <Logo iconClassName="size-4" textClassName="text-base" />
-          <p>© {new Date().getFullYear()} NetworkTools. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} SwitchCraft. All rights reserved.</p>
         </div>
       </footer>
     </div>
