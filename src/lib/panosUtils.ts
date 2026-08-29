@@ -387,12 +387,12 @@ export const generateXmlApiCommands = (
     out += `# ---- Rule placement: move all new rules ${describe} ----\n`;
     // Move in reverse order when chaining "after" the same anchor so the
     // final order matches the CSV order.
-    const ordered = placement.mode === 'after' ? [...rules].reverse() : rules;
+    const ordered = effectivePlacement.mode === 'after' ? [...rules].reverse() : rules;
     ordered.forEach((rule) => {
       out += `curl -k -X POST "https://${host}/api/" \\\n`;
       out += `  --data-urlencode "type=op" \\\n`;
       out += `  --data-urlencode "key=${opts.apiKeyPlaceholder}" \\\n`;
-      out += `  --data-urlencode "cmd=${moveRuleCmd(rule.rule_name, opts, placement)}"\n\n`;
+      out += `  --data-urlencode "cmd=${moveRuleCmd(rule.rule_name, opts, effectivePlacement)}"\n\n`;
     });
   }
 
