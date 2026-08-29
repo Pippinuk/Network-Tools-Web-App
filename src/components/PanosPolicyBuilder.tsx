@@ -237,8 +237,9 @@ const PanosPolicyBuilder: React.FC = () => {
           {placementEnabled && (
             <>
               <p className="text-xs text-muted-foreground">
-                Positioning is applied via the XML API <code>type=op</code> move command, so it is
-                included in the <strong>XML API</strong> output only.
+                Positioning is applied via the XML API <code>type=op</code> move command and is
+                also reflected in the <strong>Terraform</strong> output, so it is included in the
+                XML API and Terraform outputs.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
