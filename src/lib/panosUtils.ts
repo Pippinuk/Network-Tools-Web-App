@@ -374,11 +374,16 @@ export const generateXmlApiCommands = (
     out += `  --data-urlencode "element=${ruleToXml(rule)}"\n\n`;
   });
 
-  if (placement.mode !== 'none') {
+  const effectivePlacement: PanosPlacement =
+    placement.mode === 'after' && !placement.afterRule
+      ? { mode: 'none', afterRule: '' }
+      : placement;
+
+  if (effectivePlacement.mode !== 'none') {
     const describe =
-      placement.mode === 'after'
-        ? `after rule "${placement.afterRule}"`
-        : `at the ${placement.mode} of the rulebase`;
+      effectivePlacement.mode === 'after'
+        ? `after rule "${effectivePlacement.afterRule}"`
+        : `at the ${effectivePlacement.mode} of the rulebase`;
     out += `# ---- Rule placement: move all new rules ${describe} ----\n`;
     // Move in reverse order when chaining "after" the same anchor so the
     // final order matches the CSV order.
