@@ -221,6 +221,63 @@ const PanosPolicyBuilder: React.FC = () => {
             <Input id="apiv" value={apiVersion} onChange={(e) => setApiVersion(e.target.value)} />
           </div>
         </div>
+
+        {/* Rule placement */}
+        <div className="space-y-3 rounded-md border border-border/60 p-4">
+          <div className="flex items-center gap-3">
+            <Switch id="placement" checked={placementEnabled} onCheckedChange={setPlacementEnabled} />
+            <Label htmlFor="placement">Place rules at a specific position in the rulebase</Label>
+          </div>
+          {placementEnabled && (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Positioning is applied via the XML API <code>type=op</code> move command, so it is
+                included in the <strong>XML API</strong> output only.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Placement</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {(
+                      [
+                        { v: 'after', label: 'After rule' },
+                        { v: 'top', label: 'Top' },
+                        { v: 'bottom', label: 'Bottom' },
+                      ] as { v: PanosPlacementMode; label: string }[]
+                    ).map((o) => (
+                      <Button
+                        key={o.v}
+                        type="button"
+                        size="sm"
+                        variant={placementMode === o.v ? 'default' : 'outline'}
+                        onClick={() => setPlacementMode(o.v as 'top' | 'bottom' | 'after')}
+                      >
+                        {o.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {placementMode === 'after' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="afterRule">Place all new rules after rule named</Label>
+                    <Input
+                      id="afterRule"
+                      value={afterRule}
+                      onChange={(e) => setAfterRule(e.target.value)}
+                      placeholder="Existing-Rule-Name"
+                    />
+                  </div>
+                )}
+              </div>
+              {placementMode === 'after' && !afterRule.trim() && (
+                <p className="text-xs text-amber-600 flex items-center gap-1.5">
+                  <AlertTriangle className="size-3.5" />
+                  Enter the name of the existing rule to anchor the new rules after.
+                </p>
+              )}
+            </>
+          )}
+        </div>
       </section>
 
       {/* Step 3 - preview */}
