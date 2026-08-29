@@ -39,6 +39,14 @@ export interface PanosTargetOptions {
   apiKeyPlaceholder: string;
 }
 
+export type PanosPlacementMode = 'none' | 'top' | 'bottom' | 'after';
+
+export interface PanosPlacement {
+  mode: PanosPlacementMode;
+  /** Existing rule name that new rules are placed after (mode = 'after') */
+  afterRule: string;
+}
+
 export const PANOS_CSV_COLUMNS = [
   'rule_name',
   'description',
@@ -330,8 +338,26 @@ const xpathFor = (opts: PanosTargetOptions, ruleName: string): string => {
   return `/config/devices/entry[@name='localhost.localdomain']/vsys/entry[@name='${opts.vsys}']/rulebase/security/rules/entry[@name='${ruleName}']`;
 };
 
+/** XML API op command to move a rule to a position in the rulebase */
+const moveRuleCmd = (ruleName: string, opts: PanosTargetOptions, placement: PanosPlacement): string => {
+  const xpath = xpathFor(opts, ruleName);
+  const where = placement.mode === 'after' ? 'after' : placement.mode; // top | bottom | after
+  const dst =
+    placement.mode === 'after' ? `<dst>${esc(placement.afterRule)}</dst>` : '';
+  return (
+    `<request><security-policy><move>` +
+    `<xpath>${esc(xpath)}</xpath>` +
+    `<where>${where}</where>${dst}` +
+    `</move></security-policy></request>`
+  );
+};
+
 /** XML API (type=config&action=set) curl commands */
-export const generateXmlApiCommands = (rules: PanosRule[], opts: PanosTargetOptions): string => {
+export const generateXmlApiCommands = (
+  rules: PanosRule[],
+  opts: PanosTargetOptions,
+  placement: PanosPlacement = { mode: 'none', afterRule: '' }
+): string => {
   const host = opts.host || '{firewall}';
   let out = '# Palo Alto PAN-OS XML API - Security Policy Rules\n';
   out += `# Target: ${opts.target === 'panorama' ? `Panorama, device-group "${opts.deviceGroup}" (${opts.rulebase})` : `Firewall, vsys "${opts.vsys}"`}\n`;
@@ -347,6 +373,28 @@ export const generateXmlApiCommands = (rules: PanosRule[], opts: PanosTargetOpti
     out += `  --data-urlencode "xpath=${xpathFor(opts, rule.rule_name)}" \\\n`;
     out += `  --data-urlencode "element=${ruleToXml(rule)}"\n\n`;
   });
+
+  const effectivePlacement: PanosPlacement =
+    placement.mode === 'after' && !placement.afterRule
+      ? { mode: 'none', afterRule: '' }
+      : placement;
+
+  if (effectivePlacement.mode !== 'none') {
+    const describe =
+      effectivePlacement.mode === 'after'
+        ? `after rule "${effectivePlacement.afterRule}"`
+        : `at the ${effectivePlacement.mode} of the rulebase`;
+    out += `# ---- Rule placement: move all new rules ${describe} ----\n`;
+    // Move in reverse order when chaining "after" the same anchor so the
+    // final order matches the CSV order.
+    const ordered = effectivePlacement.mode === 'after' ? [...rules].reverse() : rules;
+    ordered.forEach((rule) => {
+      out += `curl -k -X POST "https://${host}/api/" \\\n`;
+      out += `  --data-urlencode "type=op" \\\n`;
+      out += `  --data-urlencode "key=${opts.apiKeyPlaceholder}" \\\n`;
+      out += `  --data-urlencode "cmd=${moveRuleCmd(rule.rule_name, opts, effectivePlacement)}"\n\n`;
+    });
+  }
 
   out += '# ---- Commit ----\n';
   out += `curl -k -X POST "https://${host}/api/" \\\n`;
