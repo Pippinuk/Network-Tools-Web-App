@@ -21,6 +21,7 @@ import {
   generateXmlApiCommands,
   generateRestApiCommands,
   generateBulkXml,
+  generateTerraform,
   PanosRule,
   PanosTargetOptions,
   PanosPlacement,
@@ -80,6 +81,11 @@ const PanosPolicyBuilder: React.FC = () => {
     [rules, usePanorama, host, deviceGroup, postRulebase, vsys, apiVersion]
   );
   const bulkXml = useMemo(() => (rules.length ? generateBulkXml(rules) : ''), [rules]);
+  const terraform = useMemo(
+    () => (rules.length ? generateTerraform(rules, options, placement) : ''),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rules, usePanorama, host, deviceGroup, postRulebase, vsys, placementEnabled, placementMode, afterRule]
+  );
 
   const handleTemplate = () => {
     downloadFile(generatePanosCsvTemplate(), 'panos-security-rules-template.csv', 'text/csv');
@@ -330,12 +336,14 @@ const PanosPolicyBuilder: React.FC = () => {
               <TabsTrigger value="xml">XML API (curl)</TabsTrigger>
               <TabsTrigger value="rest">REST API (curl)</TabsTrigger>
               <TabsTrigger value="raw">Raw XML</TabsTrigger>
+              <TabsTrigger value="tf">Terraform</TabsTrigger>
             </TabsList>
 
             {[
               { key: 'xml', content: xmlApi, file: 'panos-xml-api-rules.sh', label: 'XML API commands' },
               { key: 'rest', content: restApi, file: 'panos-rest-api-rules.sh', label: 'REST API commands' },
               { key: 'raw', content: bulkXml, file: 'panos-security-rules.xml', label: 'Raw XML' },
+              { key: 'tf', content: terraform, file: 'panos-security-rules.tf', label: 'Terraform' },
             ].map((t) => (
               <TabsContent key={t.key} value={t.key} className="space-y-3">
                 <div className="flex gap-2">

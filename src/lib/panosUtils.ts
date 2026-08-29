@@ -479,3 +479,144 @@ export const generateRestApiCommands = (
 /** Single combined XML payload for all rules (useful for "set" of the whole rulebase) */
 export const generateBulkXml = (rules: PanosRule[]): string =>
   `<rules>\n${rules.map((r) => '  ' + ruleToXml(r)).join('\n')}\n</rules>`;
+
+/* ------------------------------------------------------------------ */
+/* Terraform (PaloAltoNetworks/panos provider v2)                      */
+/* ------------------------------------------------------------------ */
+
+const tfStr = (v: string) => `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+const tfList = (v: string[]) => `[${v.map(tfStr).join(', ')}]`;
+
+/**
+ * Generates HCL for the official panos Terraform provider (v2.x).
+ * Uses a single `panos_security_policy` resource that owns the ordered rule list.
+ */
+export const generateTerraform = (
+  rules: PanosRule[],
+  opts: PanosTargetOptions,
+  placement: PanosPlacement = { mode: 'none', afterRule: '' }
+): string => {
+  const isPano = opts.target === 'panorama';
+  const host = opts.host || (isPano ? 'panorama.example.com' : 'firewall.example.com');
+
+  const location = isPano
+    ? `  location = {
+    device_group = {
+      name           = var.device_group
+      rulebase       = ${tfStr(opts.rulebase === 'pre-rulebase' ? 'pre-rulebase' : 'post-rulebase')}
+      panorama_device = "localhost.localdomain"
+    }
+  }`
+    : `  location = {
+    vsys = {
+      name = var.vsys
+    }
+  }`;
+
+  const positionBlock =
+    placement.mode === 'top'
+      ? `  position = {
+    where = "first"
+  }`
+      : placement.mode === 'bottom'
+        ? `  position = {
+    where = "last"
+  }`
+        : placement.mode === 'after' && placement.afterRule
+          ? `  position = {
+    where        = "after"
+    pivot        = ${tfStr(placement.afterRule)}
+    directly     = true
+  }`
+          : '';
+
+  const ruleBlocks = rules
+    .map((r) => {
+      const lines: string[] = [];
+      lines.push(`      name                  = ${tfStr(r.rule_name)}`);
+      if (r.description) lines.push(`      description           = ${tfStr(r.description)}`);
+      if (r.tags.length) lines.push(`      tags                  = ${tfList(r.tags)}`);
+      lines.push(`      rule_type             = ${tfStr(r.rule_type || 'universal')}`);
+      lines.push(`      source_zones          = ${tfList(r.source_zone.length ? r.source_zone : ['any'])}`);
+      lines.push(`      source_addresses      = ${tfList(r.source_address.length ? r.source_address : ['any'])}`);
+      lines.push(`      source_users          = ${tfList(r.source_user.length ? r.source_user : ['any'])}`);
+      if (r.source_hip.length) lines.push(`      source_hips           = ${tfList(r.source_hip)}`);
+      lines.push(`      destination_zones     = ${tfList(r.destination_zone.length ? r.destination_zone : ['any'])}`);
+      lines.push(`      destination_addresses = ${tfList(r.destination_address.length ? r.destination_address : ['any'])}`);
+      if (r.destination_hip.length) lines.push(`      destination_hips      = ${tfList(r.destination_hip)}`);
+      lines.push(`      applications          = ${tfList(r.application.length ? r.application : ['any'])}`);
+      lines.push(`      services              = ${tfList(r.service.length ? r.service : ['application-default'])}`);
+      lines.push(`      categories            = ${tfList(r.url_category.length ? r.url_category : ['any'])}`);
+      lines.push(`      action                = ${tfStr(r.action || 'allow')}`);
+      lines.push(`      log_start             = ${r.log_start ? 'true' : 'false'}`);
+      lines.push(`      log_end               = ${r.log_end ? 'true' : 'false'}`);
+      if (r.log_setting) lines.push(`      log_setting           = ${tfStr(r.log_setting)}`);
+      if (r.schedule && r.schedule.toLowerCase() !== 'any')
+        lines.push(`      schedule              = ${tfStr(r.schedule)}`);
+      if (r.profile_group)
+        lines.push(`      profile_setting = {
+        group = ${tfList([r.profile_group])}
+      }`);
+      lines.push(`      disabled              = ${r.disabled ? 'true' : 'false'}`);
+      lines.push(`      negate_source         = ${r.negate_source ? 'true' : 'false'}`);
+      lines.push(`      negate_destination    = ${r.negate_destination ? 'true' : 'false'}`);
+      return `    {\n${lines.join('\n')}\n    },`;
+    })
+    .join('\n');
+
+  return `# Palo Alto Networks - Terraform security policy
+# Provider: PaloAltoNetworks/panos (v2.x)
+# Target: ${isPano ? `Panorama device group (${opts.rulebase})` : `Firewall vsys ${opts.vsys}`}
+# Generated: ${new Date().toISOString()}
+#
+# Usage:
+#   terraform init && terraform plan
+#   Credentials are best supplied via environment variables:
+#     PANOS_HOSTNAME, PANOS_API_KEY  (or PANOS_USERNAME / PANOS_PASSWORD)
+
+terraform {
+  required_providers {
+    panos = {
+      source  = "PaloAltoNetworks/panos"
+      version = "~> 2.0"
+    }
+  }
+}
+
+variable "panos_hostname" {
+  type    = string
+  default = ${tfStr(host)}
+}
+
+variable "panos_api_key" {
+  type      = string
+  sensitive = true
+}
+
+${
+  isPano
+    ? `variable "device_group" {
+  type    = string
+  default = ${tfStr(opts.deviceGroup)}
+}
+`
+    : `variable "vsys" {
+  type    = string
+  default = ${tfStr(opts.vsys)}
+}
+`
+}
+provider "panos" {
+  hostname = var.panos_hostname
+  api_key  = var.panos_api_key
+}
+
+resource "panos_security_policy" "generated" {
+${location}
+${positionBlock ? positionBlock + '\n' : ''}
+  rules = [
+${ruleBlocks}
+  ]
+}
+`;
+};
