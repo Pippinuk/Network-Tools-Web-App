@@ -23,6 +23,8 @@ import {
   generateBulkXml,
   PanosRule,
   PanosTargetOptions,
+  PanosPlacement,
+  PanosPlacementMode,
 } from '@/lib/panosUtils';
 import {
   AlertTriangle,
@@ -49,6 +51,10 @@ const PanosPolicyBuilder: React.FC = () => {
   const [vsys, setVsys] = useState('vsys1');
   const [apiVersion, setApiVersion] = useState('v11.0');
 
+  const [placementEnabled, setPlacementEnabled] = useState(false);
+  const [placementMode, setPlacementMode] = useState<'top' | 'bottom' | 'after'>('after');
+  const [afterRule, setAfterRule] = useState('');
+
   const options: PanosTargetOptions = {
     target: usePanorama ? 'panorama' : 'firewall',
     host: host.trim(),
@@ -58,10 +64,15 @@ const PanosPolicyBuilder: React.FC = () => {
     apiKeyPlaceholder: '{api_key}',
   };
 
+  const placement: PanosPlacement = {
+    mode: placementEnabled ? placementMode : 'none',
+    afterRule: afterRule.trim(),
+  };
+
   const xmlApi = useMemo(
-    () => (rules.length ? generateXmlApiCommands(rules, options) : ''),
+    () => (rules.length ? generateXmlApiCommands(rules, options, placement) : ''),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rules, usePanorama, host, deviceGroup, postRulebase, vsys]
+    [rules, usePanorama, host, deviceGroup, postRulebase, vsys, placementEnabled, placementMode, afterRule]
   );
   const restApi = useMemo(
     () => (rules.length ? generateRestApiCommands(rules, options, apiVersion) : ''),
