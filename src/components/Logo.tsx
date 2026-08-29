@@ -18,7 +18,7 @@ const Logo: React.FC<LogoProps> = ({
     <div className={cn('flex items-center gap-2', className)}>
       <Network className={cn('text-primary size-6 animate-pulse-subtle', iconClassName)} />
       <span className={cn('font-medium tracking-tight text-xl', textClassName)}>
-        NetworkTools
+        SwitchCraft
       </span>
     </div>
   );
