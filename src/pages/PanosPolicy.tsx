@@ -24,7 +24,7 @@ const PanosPolicy = () => (
           PAN-OS Security Policy Generator
         </h1>
         <p className="mt-3 text-muted-foreground max-w-2xl mx-auto">
-          Upload a CSV of App-ID based security rules and convert it into ready-to-run Panorama or
+          Create App-ID based security rules or upload a CSV and convert them into ready-to-run Panorama or
           firewall API commands — XML API, REST API, raw XML, or Terraform HCL.
         </p>
       </section>
