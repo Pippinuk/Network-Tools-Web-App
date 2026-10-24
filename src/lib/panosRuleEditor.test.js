@@ -5,7 +5,7 @@ import { parsePanosCsv, generatePanosCsvTemplate, generateBulkXml, generateRestA
 const options = { target: 'panorama', host: 'panorama.example.com', deviceGroup: 'Branch', rulebase: 'pre-rulebase', vsys: 'vsys1', apiKeyPlaceholder: '{api_key}' };
 
 // A draft with every UI-required field filled in.
-const baseDraft = (overrides: Record<string, string> = {}) => ({
+const baseDraft = (overrides = {}) => ({
   ...createPanosRuleDraft(),
   rule_name: 'My-Rule',
   source_zone: 'Trust',
