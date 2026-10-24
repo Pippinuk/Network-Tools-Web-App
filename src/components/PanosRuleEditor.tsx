@@ -4,10 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Save } from 'lucide-react';
+import { AlertTriangle, Plus, Save } from 'lucide-react';
 import { PanosRuleDraft } from '@/lib/panosRuleEditor';
 import { PanosRule } from '@/lib/panosUtils';
-import { parsePanosRuleDraft } from '@/lib/panosRuleEditor';
+import { getPanosFieldWarning, parsePanosRuleDraft } from '@/lib/panosRuleEditor';
 
 interface Props {
   draft: PanosRuleDraft;
@@ -44,14 +44,22 @@ const PanosRuleEditor = ({ draft, onChange, onSave, onCancel, editing }: Props) 
         {groups.map(group => (
           <fieldset key={group.title} className="min-w-0 space-y-3">
             <legend className="mb-2 text-sm font-semibold">{group.title}</legend>
-            {group.fields.map(([key, label]) => (
+            {group.fields.map(([key, label]) => {
+              const warning = getPanosFieldWarning(key, draft[key]);
+              return (
               <div key={key} className="space-y-1.5">
                 <Label htmlFor={`rule-${key}`}>{label}</Label>
-                <Input id={`rule-${key}`} value={draft[key]} required={key === 'rule_name'}
-                  placeholder={key === 'rule_name' ? 'Allow-Corporate-Web' : undefined}
+                <Input id={`rule-${key}`} value={draft[key]} required={key === 'rule_name' || key === 'application'}
+                  aria-describedby={warning ? `rule-${key}-warning` : undefined}
+                  placeholder={key === 'rule_name' ? 'Allow-Corporate-Web' : key === 'application' ? 'web-browsing;ssl' : undefined}
                   onChange={e => update(key, e.target.value)} />
+                {warning && <p id={`rule-${key}-warning`} role="status" className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <AlertTriangle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+                  <span>{warning}</span>
+                </p>}
               </div>
-            ))}
+              );
+            })}
           </fieldset>
         ))}
         <fieldset className="space-y-3 min-w-0">
