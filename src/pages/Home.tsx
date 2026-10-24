@@ -29,7 +29,7 @@ const Home = () => {
     {
       id: 'panos',
       title: 'PAN-OS Security Policies',
-      description: 'Upload a CSV of App-ID based rules and generate Panorama or firewall API, XML, REST, or Terraform commands.',
+      description: 'Create App-ID based rules or upload a CSV and generate Panorama or firewall API, XML, REST, or Terraform commands.',
       icon: Shield,
       path: '/panos',
       color: 'bg-orange-500/10 text-orange-600',

@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { downloadFile } from '@/lib/exportUtils';
+import PanosRuleEditor from '@/components/PanosRuleEditor';
+import { createPanosRuleDraft, ruleToDraft } from '@/lib/panosRuleEditor';
 import {
   generatePanosCsvTemplate,
   parsePanosCsv,
@@ -35,6 +37,9 @@ import {
   ShieldCheck,
   Trash2,
   Upload,
+  Pencil,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 
 const PanosPolicyBuilder: React.FC = () => {
@@ -44,6 +49,27 @@ const PanosPolicyBuilder: React.FC = () => {
   const [rules, setRules] = useState<PanosRule[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
+  const [inputMode, setInputMode] = useState('manual');
+  const [draft, setDraft] = useState(createPanosRuleDraft);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const resetEditor = () => { setDraft(createPanosRuleDraft()); setEditingIndex(null); };
+  const saveRule = (rule: PanosRule): string | void => {
+    if (rules.some((existing, index) => index !== editingIndex && existing.rule_name === rule.rule_name)) {
+      return 'A rule with this name already exists. Choose a unique rule name.';
+    }
+    setRules(previous => editingIndex === null ? [...previous, rule] : previous.map((existing, index) => index === editingIndex ? rule : existing));
+    resetEditor();
+  };
+  const moveRule = (index: number, direction: number) => {
+    setRules(previous => {
+      const reordered = [...previous];
+      const destination = index + direction;
+      if (destination < 0 || destination >= reordered.length) return previous;
+      [reordered[index], reordered[destination]] = [reordered[destination], reordered[index]];
+      return reordered;
+    });
+    resetEditor();
+  };
 
   const [usePanorama, setUsePanorama] = useState(true);
   const [host, setHost] = useState('');
@@ -98,6 +124,7 @@ const PanosPolicyBuilder: React.FC = () => {
     setRules(result.rules);
     setErrors(result.errors);
     setFileName(file.name);
+    resetEditor();
     toast({
       title: result.rules.length ? 'CSV imported' : 'Nothing imported',
       description: `${result.rules.length} rule(s) parsed${result.errors.length ? `, ${result.errors.length} warning(s)` : ''}.`,
@@ -118,6 +145,7 @@ const PanosPolicyBuilder: React.FC = () => {
     setRules([]);
     setErrors([]);
     setFileName('');
+    resetEditor();
     if (fileRef.current) fileRef.current.value = '';
   };
 
@@ -127,8 +155,28 @@ const PanosPolicyBuilder: React.FC = () => {
       <section className="space-y-4">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <FileSpreadsheet className="size-5" />
-          1. Upload your rule definitions
+          1. Define security rules
         </h2>
+        <Tabs value={inputMode} onValueChange={setInputMode}>
+          <TabsList>
+            <TabsTrigger value="manual">Create in UI</TabsTrigger>
+            <TabsTrigger value="csv">Upload CSV</TabsTrigger>
+          </TabsList>
+          <TabsContent value="manual" className="space-y-5">
+            <details className="border-b border-border pb-4" open>
+              <summary className="cursor-pointer text-sm font-medium">Example rule — not included in output</summary>
+              <dl className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                {[
+                  ['Rule name', 'Example-Allow-Web'], ['Source zones / addresses', 'Trust / Corp-Users-Net'],
+                  ['Destination zones / addresses', 'Untrust / any'], ['Applications', 'web-browsing;ssl;dns'],
+                  ['Service / action', 'application-default / allow'], ['Schedule', 'any'],
+                  ['Disabled / negate source / negate destination', 'no / no / no'],
+                ].map(([label, value]) => <div key={label} className="min-w-0"><dt className="text-muted-foreground">{label}</dt><dd className="break-words font-medium">{value}</dd></div>)}
+              </dl>
+            </details>
+            <PanosRuleEditor draft={draft} onChange={setDraft} onSave={saveRule} onCancel={resetEditor} editing={editingIndex !== null} />
+          </TabsContent>
+          <TabsContent value="csv" className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Start from the template — it contains every field needed to build App-ID based security
           rules. Use a semicolon (;) to separate multiple values inside one field.
@@ -176,6 +224,8 @@ const PanosPolicyBuilder: React.FC = () => {
             </ul>
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </section>
 
       {/* Step 2 - target */}
@@ -290,7 +340,10 @@ const PanosPolicyBuilder: React.FC = () => {
       {/* Step 3 - preview */}
       {rules.length > 0 && (
         <section className="space-y-4">
-          <h2 className="text-lg font-semibold">3. Parsed rules</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">3. Rules ({rules.length})</h2>
+            <Button variant="ghost" size="sm" onClick={clearAll} className="gap-2"><Trash2 className="size-4" />Clear all</Button>
+          </div>
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
@@ -305,6 +358,7 @@ const PanosPolicyBuilder: React.FC = () => {
                   <TableHead>Service</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Profiles</TableHead>
+                  <TableHead>Manage</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -320,6 +374,17 @@ const PanosPolicyBuilder: React.FC = () => {
                     <TableCell>{r.service.join(', ')}</TableCell>
                     <TableCell className="capitalize">{r.action}</TableCell>
                     <TableCell>{r.profile_group || '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" title="Edit rule" aria-label={`Edit ${r.rule_name}`} onClick={() => {
+                          setDraft(ruleToDraft(r)); setEditingIndex(i); setInputMode('manual');
+                          document.getElementById('rule-rule_name')?.scrollIntoView({ block: 'center' });
+                        }}><Pencil className="size-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Move up" aria-label={`Move ${r.rule_name} up`} disabled={i === 0} onClick={() => moveRule(i, -1)}><ArrowUp className="size-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Move down" aria-label={`Move ${r.rule_name} down`} disabled={i === rules.length - 1} onClick={() => moveRule(i, 1)}><ArrowDown className="size-4" /></Button>
+                        <Button size="icon" variant="ghost" title="Delete rule" aria-label={`Delete ${r.rule_name}`} onClick={() => { setRules(previous => previous.filter((_, index) => index !== i)); resetEditor(); }}><Trash2 className="size-4" /></Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -333,7 +398,7 @@ const PanosPolicyBuilder: React.FC = () => {
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">4. Generated API commands</h2>
           <Tabs defaultValue="xml">
-            <TabsList>
+            <TabsList className="h-auto flex flex-wrap justify-start">
               <TabsTrigger value="xml">XML API (curl)</TabsTrigger>
               <TabsTrigger value="rest">REST API (curl)</TabsTrigger>
               <TabsTrigger value="raw">Raw XML</TabsTrigger>
