@@ -279,7 +279,7 @@ export const parsePanosCsv = (text: string): PanosParseResult => {
       log_start: toBool(get(row, 'log_start'), false),
       log_end: toBool(get(row, 'log_end'), true),
       log_setting: get(row, 'log_setting'),
-      schedule: get(row, 'schedule'),
+      schedule: get(row, 'schedule') || 'any',
       disabled: toBool(get(row, 'disabled'), false),
       negate_source: toBool(get(row, 'negate_source'), false),
       negate_destination: toBool(get(row, 'negate_destination'), false),
