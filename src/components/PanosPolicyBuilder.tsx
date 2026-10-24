@@ -224,6 +224,8 @@ const PanosPolicyBuilder: React.FC = () => {
             </ul>
           </div>
         )}
+          </TabsContent>
+        </Tabs>
       </section>
 
       {/* Step 2 - target */}
@@ -333,8 +335,6 @@ const PanosPolicyBuilder: React.FC = () => {
             </>
           )}
         </div>
-          </TabsContent>
-        </Tabs>
       </section>
 
       {/* Step 3 - preview */}
