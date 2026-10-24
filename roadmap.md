@@ -9,3 +9,4 @@
 - [x] Remove the UI App-ID any default and require explicit input.
 - [x] Warn beneath the five requested fields when any is present, without blocking intentional any rules.
 - [x] Test defaults and warnings; verify rule creation and output in the application.
+- [x] Show broad-scope "any" as a greyed hint only, require an entry in the warned fields, and colour warnings red.
