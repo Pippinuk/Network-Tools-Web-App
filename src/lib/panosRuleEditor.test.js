@@ -2,10 +2,10 @@ import { describe, test, expect } from 'bun:test';
 import { createPanosRuleDraft, parsePanosRuleDraft, ruleToDraft } from './panosRuleEditor';
 import { parsePanosCsv, generatePanosCsvTemplate, generateBulkXml, generateRestApiCommands, generateTerraform, generateXmlApiCommands } from './panosUtils';
 
-const options = { target: 'panorama' as const, host: 'panorama.example.com', deviceGroup: 'Branch', rulebase: 'pre-rulebase' as const, vsys: 'vsys1', apiKeyPlaceholder: '{api_key}' };
+const options = { target: 'panorama', host: 'panorama.example.com', deviceGroup: 'Branch', rulebase: 'pre-rulebase', vsys: 'vsys1', apiKeyPlaceholder: '{api_key}' };
 
 describe('PAN-OS rule defaults', () => {
-  for (const field of ['negate_destination', 'negate_source', 'disabled'] as const) {
+  for (const field of ['negate_destination', 'negate_source', 'disabled']) {
     test(`${field} defaults to no in UI and CSV unless changed`, () => {
       const draft = { ...createPanosRuleDraft(), rule_name: 'My-Rule' };
       expect(draft[field]).toBe('no');
