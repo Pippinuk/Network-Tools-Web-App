@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AlertTriangle, Plus, Save } from 'lucide-react';
 import { PanosRuleDraft } from '@/lib/panosRuleEditor';
 import { PanosRule } from '@/lib/panosUtils';
-import { getPanosFieldWarning, parsePanosRuleDraft } from '@/lib/panosRuleEditor';
+import { PANOS_ANY_HINT_FIELDS, PANOS_REQUIRED_FIELDS, getPanosFieldWarning, parsePanosRuleDraft } from '@/lib/panosRuleEditor';
 
 interface Props {
   draft: PanosRuleDraft;
@@ -29,16 +29,29 @@ const flags: [keyof PanosRuleDraft, string][] = [
   ['disabled', 'Disabled'], ['negate_source', 'Negate source'], ['negate_destination', 'Negate destination'],
 ];
 
+// Greyed hints only — they never become the field's value.
+const hints: Partial<Record<keyof PanosRuleDraft, string>> = {
+  rule_name: 'Allow-Corporate-Web',
+  description: 'What this rule is for',
+  tags: 'internet;approved',
+  application: 'web-browsing;ssl',
+  profile_group: 'Outbound-Security-Profiles',
+  log_setting: 'default-log-profile',
+};
+const hintFor = (key: keyof PanosRuleDraft): string | undefined =>
+  hints[key] ?? (PANOS_ANY_HINT_FIELDS.includes(key) ? 'any' : undefined);
+
 const PanosRuleEditor = ({ draft, onChange, onSave, onCancel, editing }: Props) => {
-  const [error, setError] = useState('');
-  const update = (key: keyof PanosRuleDraft, value: string) => { setError(''); onChange({ ...draft, [key]: value }); };
+  const [errors, setErrors] = useState<string[]>([]);
+  const update = (key: keyof PanosRuleDraft, value: string) => { setErrors([]); onChange({ ...draft, [key]: value }); };
   return (
-    <form className="space-y-5" onSubmit={e => {
+    <form className="space-y-5" noValidate onSubmit={e => {
       e.preventDefault();
       const result = parsePanosRuleDraft(draft);
       const rule = result.rules[0];
-      if (!rule || result.errors.length) { setError(result.errors.join(' ') || 'Enter a rule name.'); return; }
-      setError(onSave(rule) || '');
+      if (!rule || result.errors.length) { setErrors(result.errors.length ? result.errors : ['Enter a rule name.']); return; }
+      const problem = onSave(rule);
+      setErrors(problem ? [problem] : []);
     }}>
       <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
         {groups.map(group => (
@@ -47,17 +60,18 @@ const PanosRuleEditor = ({ draft, onChange, onSave, onCancel, editing }: Props) 
             {group.fields.map(([key, label]) => {
               const warning = getPanosFieldWarning(key, draft[key]);
               return (
-              <div key={key} className="space-y-1.5">
-                <Label htmlFor={`rule-${key}`}>{label}</Label>
-                <Input id={`rule-${key}`} value={draft[key]} required={key === 'rule_name' || key === 'application'}
-                  aria-describedby={warning ? `rule-${key}-warning` : undefined}
-                  placeholder={key === 'rule_name' ? 'Allow-Corporate-Web' : key === 'application' ? 'web-browsing;ssl' : undefined}
-                  onChange={e => update(key, e.target.value)} />
-                {warning && <p id={`rule-${key}-warning`} role="status" className="flex items-start gap-1.5 text-xs text-muted-foreground">
-                  <AlertTriangle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                  <span>{warning}</span>
-                </p>}
-              </div>
+                <div key={key} className="space-y-1.5">
+                  <Label htmlFor={`rule-${key}`}>{label}</Label>
+                  <Input id={`rule-${key}`} value={draft[key]} required={PANOS_REQUIRED_FIELDS.includes(key)}
+                    aria-invalid={warning ? true : undefined}
+                    aria-describedby={warning ? `rule-${key}-warning` : undefined}
+                    placeholder={hintFor(key)}
+                    onChange={e => update(key, e.target.value)} />
+                  {warning && <p id={`rule-${key}-warning`} role="status" className="flex items-start gap-1.5 text-xs font-medium text-destructive">
+                    <AlertTriangle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+                    <span>{warning}</span>
+                  </p>}
+                </div>
               );
             })}
           </fieldset>
@@ -87,10 +101,14 @@ const PanosRuleEditor = ({ draft, onChange, onSave, onCancel, editing }: Props) 
           ))}
         </fieldset>
       </div>
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {errors.length > 0 && (
+        <ul role="alert" className="space-y-1 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm font-medium text-destructive">
+          {errors.map(message => <li key={message}>{message}</li>)}
+        </ul>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button type="submit" className="gap-2">{editing ? <Save className="size-4" /> : <Plus className="size-4" />}{editing ? 'Save rule' : 'Add rule'}</Button>
-        <Button type="button" variant="outline" onClick={() => { setError(''); onCancel(); }}>{editing ? 'Cancel edit' : 'Reset fields'}</Button>
+        <Button type="button" variant="outline" onClick={() => { setErrors([]); onCancel(); }}>{editing ? 'Cancel edit' : 'Reset fields'}</Button>
       </div>
     </form>
   );
