@@ -6,6 +6,6 @@
 
 # PAN-OS rule safety checks
 
-- [ ] Remove the UI App-ID any default and require explicit input.
-- [ ] Warn beneath the five requested fields when any is present, without blocking intentional any rules.
-- [ ] Test defaults and warnings; verify rule creation and output in the application.
+- [x] Remove the UI App-ID any default and require explicit input.
+- [x] Warn beneath the five requested fields when any is present, without blocking intentional any rules.
+- [x] Test defaults and warnings; verify rule creation and output in the application.
