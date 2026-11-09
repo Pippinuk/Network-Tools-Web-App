@@ -6,6 +6,34 @@ const row = { vlanId: 100, name: 'Data', subnet: '10.10.100.0/24', isid: 10100 }
 const options = { useFirstIps: true, switchCount: 2, priority: 200, backupMaster: true, memberPorts: '', dhcpEnabled: true, dhcpServers: ['10.1.1.10'] };
 
 describe('VOSS routing tables', () => {
+  test('spreadsheet headings accept VLAN IDs 2100, 2200 and 2300', () => {
+    for (const header of ['VLAN ID,VLAN Name,Subnet,I-SID,VRF', 'vlan_id,vlan_name,subnet,isid,vrf', 'VLAN-ID,VLAN-Name,Subnet,I SID,VRF']) {
+      for (const quoted of [false, true]) {
+        let csv = `${header}\n2100,Data,10.21.0.0/24,12100,Corp\n2200,Voice,10.22.0.0/24,12200,GlobalRouter\n2300,Wireless,10.23.0.0/24,12300,Guest`;
+        if (quoted) csv = '\ufeff' + csv.split('\n').map(line => line.split(',').map(cell => `"${cell}"`).join(',')).join('\r\n');
+        const parsed = parseVlanCsv(csv, isid);
+        expect(parsed.errors).toEqual([]);
+        expect(parsed.rows.map(r => r.vlanId)).toEqual([2100, 2200, 2300]);
+        expect(parsed.rows.map(r => r.vrf)).toEqual(['Corp', 'GlobalRouter', 'Guest']);
+        expect(validateRows(parsed.rows)).toEqual([]);
+      }
+    }
+  });
+
+  test('headerless VLAN-named rows are not discarded as a header', () => {
+    const parsed = parseVlanCsv('2100,VLAN-2100,10.21.0.0/24,12100', isid);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0].vlanId).toBe(2100);
+  });
+
+  test('spreadsheet parsing still blocks reserved VLAN IDs', () => {
+    for (const id of [4048, 4060, 4094]) {
+      const parsed = parseVlanCsv(`"VLAN ID","VLAN Name","Subnet","I-SID"\n"${id}","Data","10.21.0.0/24","12100"`, isid);
+      expect(parsed.rows).toEqual([]);
+      expect(parsed.errors[0]).toContain('reserved by VOSS');
+    }
+  });
+
   test('GlobalRouter is the default for omitted and blank VRFs and the CSV template', () => {
     expect(DEFAULT_VRF).toBe('GlobalRouter');
     expect(resolveVrf()).toBe('GlobalRouter');
