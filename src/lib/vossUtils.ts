@@ -245,6 +245,30 @@ export interface CsvParseResult {
   errors: string[];
 }
 
+// Spreadsheet exports may quote every cell, including headings and numbers.
+const splitVlanCsvLine = (line: string): string[] => {
+  const cells: string[] = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (quoted && line[i + 1] === '"') {
+        value += '"';
+        i++;
+      } else quoted = !quoted;
+    } else if (ch === ',' && !quoted) {
+      cells.push(value.trim());
+      value = '';
+    } else value += ch;
+  }
+  cells.push(value.trim());
+  return cells;
+};
+
+const normalizeVlanHeader = (header: string): string =>
+  header.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 export const parseVlanCsv = (
   text: string,
   isidOptions: IsidOptions,
@@ -260,15 +284,19 @@ export const parseVlanCsv = (
 
   if (lines.length === 0) return { rows, errors: ['CSV file is empty'] };
 
-  let startIdx = 0;
-  if (lines[0].toLowerCase().includes('vlan')) startIdx = 1;
-  const headers = startIdx ? lines[0].toLowerCase().split(',').map((c) => c.trim()) : [];
+  const firstCells = splitVlanCsvLine(lines[0]);
+  const normalizedHeaders = firstCells.map(normalizeVlanHeader);
+  const startIdx = normalizedHeaders.includes('vlanid') || normalizedHeaders[0] === 'vlan' ? 1 : 0;
+  const headers = startIdx ? normalizedHeaders.map(h => h === 'vlan' ? 'vlanid' : h) : [];
+  if (headers.length && !layer2Only && !headers.includes('subnet')) {
+    return { rows, errors: ['CSV header is missing the subnet column required for Layer 3 configuration'] };
+  }
 
   for (let i = startIdx; i < lines.length; i++) {
-    const cols = lines[i].split(',').map((c) => c.trim());
+    const cols = splitVlanCsvLine(lines[i]);
     const lineNo = i + 1;
     const cell = (name: string, legacyIndex: number): string => {
-      const index = headers.length ? headers.indexOf(name) : legacyIndex;
+      const index = headers.length ? headers.indexOf(normalizeVlanHeader(name)) : legacyIndex;
       return index < 0 ? '' : cols[index] || '';
     };
     const vlanId = parseInt(cell('vlan_id', 0), 10);
@@ -286,7 +314,7 @@ export const parseVlanCsv = (
     }
 
     if (!isValidVlanId(vlanId)) {
-      errors.push(`Line ${lineNo}: invalid VLAN ID "${cols[0]}"`);
+      errors.push(`Line ${lineNo}: invalid VLAN ID "${cell('vlan_id', 0)}"`);
       continue;
     }
     if (isReservedVlanId(vlanId)) {
