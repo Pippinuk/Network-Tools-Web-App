@@ -13,6 +13,6 @@
 
 # VOSS VRF support
 
-- [ ] Add default and per-VLAN VRFs to automatic/manual creation and CSV import/export.
-- [ ] Generate VRF-aware interfaces and DHCP relay paths while preserving GlobalRouter and Layer 2-only behaviour.
-- [ ] Test routing defaults, CSV compatibility and command scope; verify the application flow.
+- [x] Add default and per-VLAN VRFs to automatic/manual creation and CSV import/export.
+- [x] Generate VRF-aware interfaces and DHCP relay paths while preserving GlobalRouter and Layer 2-only behaviour.
+- [x] Test routing defaults, CSV compatibility and command scope; verify the application flow.

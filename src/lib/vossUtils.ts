@@ -416,9 +416,6 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
     lines.push('enable');
     lines.push('configure terminal');
     lines.push('');
-    lines.push('router vrrp enable');
-    lines.push('');
-
     rows.forEach((row, rowIndex) => {
       const vrf = resolveVrf(row.vrf, vrrp.defaultVrf);
       if (!isValidVrf(vrf)) throw new Error(`Invalid VRF for VLAN ${row.vlanId}`);

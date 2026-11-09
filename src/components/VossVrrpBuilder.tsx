@@ -741,7 +741,7 @@ const VossVrrpBuilder: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Input
-                          className="h-8"
+                          className="h-8 min-w-36"
                           value={row.name}
                           onChange={(e) => updateRow(index, { name: e.target.value })}
                         />
@@ -749,7 +749,7 @@ const VossVrrpBuilder: React.FC = () => {
                       {!layer2Only && (
                         <TableCell>
                           <Input
-                            className="h-8 font-mono"
+                            className="h-8 min-w-40 font-mono"
                             value={row.subnet}
                             placeholder="10.10.100.0/24"
                             onChange={(e) => updateRow(index, { subnet: e.target.value })}

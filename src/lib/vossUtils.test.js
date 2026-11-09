@@ -18,6 +18,8 @@ describe('VOSS routing tables', () => {
     }
     const config = generateVossVrrpConfig([row], options);
     expect(config).not.toContain('vrf GlobalRouter');
+    expect(config).not.toContain('router vrrp enable');
+    expect(config).toContain('ip vrrp 100 enable');
     expect(config).toContain('ip dhcp-relay fwd-path 10.10.100.2 10.1.1.10');
   });
 
