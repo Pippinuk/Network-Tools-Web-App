@@ -10,3 +10,9 @@
 - [x] Warn beneath the five requested fields when any is present, without blocking intentional any rules.
 - [x] Test defaults and warnings; verify rule creation and output in the application.
 - [x] Show broad-scope "any" as a greyed hint only, require an entry in the warned fields, and colour warnings red.
+
+# VOSS VRF support
+
+- [x] Add default and per-VLAN VRFs to automatic/manual creation and CSV import/export.
+- [x] Generate VRF-aware interfaces and DHCP relay paths while preserving GlobalRouter and Layer 2-only behaviour.
+- [x] Test routing defaults, CSV compatibility and command scope; verify the application flow.

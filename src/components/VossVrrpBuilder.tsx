@@ -22,6 +22,8 @@ import {
 import {
   CSV_TEMPLATE,
   CSV_TEMPLATE_L2,
+  DEFAULT_VRF,
+  resolveVrf,
   IsidMode,
   IsidOptions,
   VridMode,
@@ -67,6 +69,7 @@ const defaultVrrp: VrrpOptions = {
   dhcpEnabled: false,
   dhcpServers: ['', '', ''],
   masterMode: 'first',
+  defaultVrf: DEFAULT_VRF,
 };
 
 const masterModeLabels: Record<MasterMode, string> = {
@@ -143,7 +146,7 @@ const VossVrrpBuilder: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const baseErrors = useMemo(() => validateRows(rows, layer2Only), [rows, layer2Only]);
+  const baseErrors = useMemo(() => validateRows(rows, layer2Only, vrrp.defaultVrf), [rows, layer2Only, vrrp.defaultVrf]);
 
   const masterMode: MasterMode = vrrp.masterMode ?? 'first';
 
@@ -355,10 +358,10 @@ const VossVrrpBuilder: React.FC = () => {
           ) : (
           <p className="text-sm text-muted-foreground">
             Upload a CSV with the columns{' '}
-            <span className="font-mono">vlan_id, vlan_name, subnet, isid, vrid, master_switch, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3</span>.
+            <span className="font-mono">vlan_id, vlan_name, subnet, isid, vrid, master_switch, dhcp_enabled, dhcp_server_1, dhcp_server_2, dhcp_server_3, vrf</span>.
             Leave the I-SID or VRRP instance ID (vrid) blank to auto-generate them. Set <span className="font-mono">master_switch</span> to the
             switch number (1, 2, ...) that should be VRRP master for that VLAN — blank follows the master distribution rule below. Set <span className="font-mono">dhcp_enabled</span> to yes/no per VLAN — blank falls back
-            to the DHCP relay settings below.
+            to the DHCP relay settings below. Set <span className="font-mono">vrf</span> to an existing routing table name; blank or missing uses GlobalRouter.
           </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -460,6 +463,12 @@ const VossVrrpBuilder: React.FC = () => {
           <div className="grid gap-4 sm:grid-cols-2">
             {!layer2Only && (
               <>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="defaultVrf">Default VRF (routing table)</Label>
+              <Input id="defaultVrf" value={vrrp.defaultVrf ?? DEFAULT_VRF} placeholder={DEFAULT_VRF}
+                onChange={(e) => setVrrp({ ...vrrp, defaultVrf: e.target.value })} />
+              <p className="text-xs text-muted-foreground">GlobalRouter is the default routing table. Named VRFs must already exist on the switches. Each VLAN can override this value below.</p>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="switchCount">Switches in cluster</Label>
               <Input
@@ -684,7 +693,7 @@ const VossVrrpBuilder: React.FC = () => {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  downloadFile(rowsToCsv(rows, vrrp.useFirstIps, layer2Only), 'voss-vlan-plan.csv', 'text/csv')
+                  downloadFile(rowsToCsv(rows, vrrp.useFirstIps, layer2Only, vrrp.defaultVrf), 'voss-vlan-plan.csv', 'text/csv')
                 }
                 className="gap-2"
               >
@@ -703,6 +712,7 @@ const VossVrrpBuilder: React.FC = () => {
                   <TableHead className="w-24">VLAN ID</TableHead>
                   <TableHead>Name</TableHead>
                   {!layer2Only && <TableHead>Subnet (CIDR)</TableHead>}
+                  {!layer2Only && <TableHead>VRF</TableHead>}
                   <TableHead className="w-32">I-SID</TableHead>
                   {!layer2Only && (
                     <>
@@ -731,7 +741,7 @@ const VossVrrpBuilder: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Input
-                          className="h-8"
+                          className="h-8 min-w-36"
                           value={row.name}
                           onChange={(e) => updateRow(index, { name: e.target.value })}
                         />
@@ -739,10 +749,21 @@ const VossVrrpBuilder: React.FC = () => {
                       {!layer2Only && (
                         <TableCell>
                           <Input
-                            className="h-8 font-mono"
+                            className="h-8 min-w-40 font-mono"
                             value={row.subnet}
                             placeholder="10.10.100.0/24"
                             onChange={(e) => updateRow(index, { subnet: e.target.value })}
+                          />
+                        </TableCell>
+                      )}
+                      {!layer2Only && (
+                        <TableCell>
+                          <Input
+                            aria-label={`VRF for VLAN ${row.vlanId}`}
+                            className="h-8 min-w-40 font-mono"
+                            value={row.vrf ?? ''}
+                            placeholder={resolveVrf(undefined, vrrp.defaultVrf)}
+                            onChange={(e) => updateRow(index, { vrf: e.target.value || undefined })}
                           />
                         </TableCell>
                       )}
