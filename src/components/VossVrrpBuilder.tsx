@@ -756,6 +756,17 @@ const VossVrrpBuilder: React.FC = () => {
                           />
                         </TableCell>
                       )}
+                      {!layer2Only && (
+                        <TableCell>
+                          <Input
+                            aria-label={`VRF for VLAN ${row.vlanId}`}
+                            className="h-8 min-w-40 font-mono"
+                            value={row.vrf ?? ''}
+                            placeholder={resolveVrf(undefined, vrrp.defaultVrf)}
+                            onChange={(e) => updateRow(index, { vrf: e.target.value || undefined })}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Input
                           type="number"
