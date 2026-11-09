@@ -110,6 +110,19 @@ describe('VOSS routing tables', () => {
     }
   });
 
+  test('multiple MLT/SMLT IDs each produce a vlan mlt command', () => {
+    expect(parseMltIds('1, 2 3;2')).toEqual([1, 2, 3]);
+    expect(parseMltIds('')).toEqual([]);
+    expect(parseMltIds('0, 513, abc, 7')).toEqual([7]);
+    const config = generateVossVrrpConfig([row], { ...options, mltIds: [1, 2, 3] });
+    expect(config).toContain('vlan mlt 100 1');
+    expect(config).toContain('vlan mlt 100 2');
+    expect(config).toContain('vlan mlt 100 3');
+    const l2 = generateVossVrrpConfig([{ ...row, subnet: '' }], { ...options, layer2Only: true, mltIds: [4, 5] });
+    expect(l2).toContain('vlan mlt 100 4');
+    expect(l2).toContain('vlan mlt 100 5');
+  });
+
   test('Layer 2-only output has no routing, VRRP or DHCP commands', () => {
     const config = generateVossVrrpConfig([{ ...row, subnet: '', vrf: 'Corp' }], { ...options, layer2Only: true });
     expect(config).toContain('vlan i-sid 100 10100');
