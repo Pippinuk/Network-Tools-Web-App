@@ -13,7 +13,15 @@ export interface VlanRow {
   masterSwitch?: number;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
+  vrf?: string;
 }
+
+export const DEFAULT_VRF = 'GlobalRouter';
+export const resolveVrf = (vrf?: string, fallback = DEFAULT_VRF): string => {
+  const name = vrf?.trim() || fallback.trim() || DEFAULT_VRF;
+  return name.toLowerCase() === DEFAULT_VRF.toLowerCase() ? DEFAULT_VRF : name;
+};
+export const isValidVrf = (name: string): boolean => /^[a-zA-Z0-9_.-]{1,16}$/.test(name);
 
 export type IsidMode = 'offset' | 'prefix';
 
@@ -108,6 +116,7 @@ export interface VrrpOptions {
   vrid?: VridOptions;
   masterMode?: MasterMode;
   layer2Only?: boolean;
+  defaultVrf?: string;
   dhcpEnabled?: boolean;
   dhcpServers?: string[];
 }
@@ -216,10 +225,10 @@ export const CSV_TEMPLATE_L2 = `vlan_id,vlan_name,isid
 102,Wireless,
 `;
 
-export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3
-100,Data,10.10.100.0/24,10100,1,1,yes,10.1.1.10,10.1.1.11,
-101,Voice,10.10.101.0/24,10101,2,2,yes,10.1.1.10,,
-102,Wireless,10.10.102.0/24,,,,no,,,
+export const CSV_TEMPLATE = `vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,vrf
+100,Data,10.10.100.0/24,10100,1,1,yes,10.1.1.10,10.1.1.11,,GlobalRouter
+101,Voice,10.10.101.0/24,10101,2,2,yes,10.1.1.10,,,GlobalRouter
+102,Wireless,10.10.102.0/24,,,,no,,,,GlobalRouter
 `;
 
 const parseBoolCell = (value?: string): boolean | undefined => {
@@ -253,18 +262,28 @@ export const parseVlanCsv = (
 
   let startIdx = 0;
   if (lines[0].toLowerCase().includes('vlan')) startIdx = 1;
+  const headers = startIdx ? lines[0].toLowerCase().split(',').map((c) => c.trim()) : [];
 
   for (let i = startIdx; i < lines.length; i++) {
     const cols = lines[i].split(',').map((c) => c.trim());
     const lineNo = i + 1;
-    const vlanId = parseInt(cols[0], 10);
-    const name = cols[1] || '';
-    const subnet = cols[2] || '';
-    const isidRaw = layer2Only && cols.length <= 3 ? cols[2] : cols[3];
-    const vridRaw = cols[4];
-    const masterRaw = cols[5];
-    const dhcpEnabled = parseBoolCell(cols[6]);
-    const dhcpServers = [cols[7], cols[8], cols[9]].map((c) => (c || '').trim()).filter(Boolean);
+    const cell = (name: string, legacyIndex: number): string => {
+      const index = headers.length ? headers.indexOf(name) : legacyIndex;
+      return index < 0 ? '' : cols[index] || '';
+    };
+    const vlanId = parseInt(cell('vlan_id', 0), 10);
+    const name = cell('vlan_name', 1);
+    const subnet = cell('subnet', 2);
+    const isidRaw = cell('isid', layer2Only && cols.length <= 3 ? 2 : 3);
+    const vridRaw = cell('vrid', 4);
+    const masterRaw = cell('master_switch', 5);
+    const dhcpEnabled = parseBoolCell(cell('dhcp_enabled', 6));
+    const dhcpServers = [cell('dhcp_server_1', 7), cell('dhcp_server_2', 8), cell('dhcp_server_3', 9)].filter(Boolean);
+    const vrf = resolveVrf(cell('vrf', 10));
+    if (!layer2Only && !isValidVrf(vrf)) {
+      errors.push(`Line ${lineNo}: VRF must be 1-16 characters (letters, numbers, . _ -)`);
+      continue;
+    }
 
     if (!isValidVlanId(vlanId)) {
       errors.push(`Line ${lineNo}: invalid VLAN ID "${cols[0]}"`);
@@ -306,6 +325,7 @@ export const parseVlanCsv = (
 
     rows.push({
       vlanId,
+      vrf,
       name: name || `VLAN-${vlanId}`,
       subnet: layer2Only && !isValidSubnet(subnet) ? '' : subnet,
       isid,
@@ -319,7 +339,7 @@ export const parseVlanCsv = (
   return { rows, errors };
 };
 
-export const validateRows = (rows: VlanRow[], layer2Only = false): string[] => {
+export const validateRows = (rows: VlanRow[], layer2Only = false, defaultVrf = DEFAULT_VRF): string[] => {
   const errors: string[] = [];
   const seenVlan = new Set<number>();
   const seenIsid = new Set<number>();
@@ -328,6 +348,9 @@ export const validateRows = (rows: VlanRow[], layer2Only = false): string[] => {
     if (!isValidVlanId(row.vlanId)) errors.push(`VLAN ${row.vlanId} is out of range (2-4094)`);
     if (isReservedVlanId(row.vlanId)) errors.push(`VLAN ${row.vlanId} is reserved by VOSS`);
     if (!layer2Only && !isValidSubnet(row.subnet)) errors.push(`VLAN ${row.vlanId}: invalid subnet "${row.subnet}"`);
+    if (!layer2Only && !isValidVrf(resolveVrf(row.vrf, defaultVrf))) {
+      errors.push(`VLAN ${row.vlanId}: VRF must be 1-16 characters (letters, numbers, . _ -)`);
+    }
     if (!isValidIsid(row.isid)) errors.push(`VLAN ${row.vlanId}: invalid I-SID "${row.isid}"`);
     if (row.vrid !== undefined && !isValidVrid(row.vrid)) {
       errors.push(`VLAN ${row.vlanId}: VRRP instance ID must be between 1 and 255`);
@@ -397,6 +420,8 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
     lines.push('');
 
     rows.forEach((row, rowIndex) => {
+      const vrf = resolveVrf(row.vrf, vrrp.defaultVrf);
+      if (!isValidVrf(vrf)) throw new Error(`Invalid VRF for VLAN ${row.vlanId}`);
       const vrid = row.vrid ?? computeVrid(row.vlanId, rowIndex, vrrp.vrid ?? defaultVridOptions);
       const addr = getSubnetAddressing(row.subnet, vrrp.useFirstIps, switchCount);
       const interfaceIp = addr.switchIps[s];
@@ -405,7 +430,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       const distance = (s - masterIndex + switchCount) % switchCount;
       const priority = Math.max(1, vrrp.priority - distance * 20);
 
-      lines.push(`# --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
+      lines.push(`# --- VLAN ${row.vlanId} (${row.name}) - ${row.subnet} - VRF ${vrf} - I-SID ${row.isid} - VRID ${vrid} - master: switch ${masterIndex + 1} ---`);
       lines.push(`vlan create ${row.vlanId} name "${row.name}" type port-mstprstp 0`);
       lines.push(`vlan i-sid ${row.vlanId} ${row.isid}`);
       if (vrrp.memberPorts.trim()) {
@@ -413,6 +438,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       }
       if (vrrp.mltId) lines.push(`vlan mlt ${row.vlanId} ${vrrp.mltId}`);
       lines.push(`interface vlan ${row.vlanId}`);
+      if (vrf !== DEFAULT_VRF) lines.push(`vrf ${vrf}`);
       lines.push(`ip address ${interfaceIp} ${prefixToMask(addr.prefix)}`);
       lines.push('ip vrrp version 3');
       lines.push(`ip vrrp address ${vrid} ${addr.virtualIp}`);
@@ -428,11 +454,13 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
         lines.push('ip dhcp-relay');
         lines.push('exit');
         lines.push(`# DHCP relay forward paths for VLAN ${row.vlanId}`);
+        if (vrf !== DEFAULT_VRF) lines.push(`router vrf ${vrf}`);
         dhcpServers.forEach((server) => {
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server}`);
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server} enable`);
           lines.push(`ip dhcp-relay fwd-path ${interfaceIp} ${server} mode bootp_dhcp`);
         });
+        if (vrf !== DEFAULT_VRF) lines.push('exit');
         lines.push('');
         return;
       }
@@ -449,12 +477,12 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
   return lines.join('\n');
 };
 
-export const rowsToCsv = (rows: VlanRow[], useFirstIps = true, layer2Only = false): string => {
+export const rowsToCsv = (rows: VlanRow[], useFirstIps = true, layer2Only = false, defaultVrf = DEFAULT_VRF): string => {
   if (layer2Only) {
     return ['vlan_id,vlan_name,isid', ...rows.map((r) => [r.vlanId, r.name, r.isid].join(','))].join('\n');
   }
   const header =
-    'vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask';
+    'vlan_id,vlan_name,subnet,isid,vrid,master_switch,dhcp_enabled,dhcp_server_1,dhcp_server_2,dhcp_server_3,gateway_vip,subnet_mask,vrf';
   const body = rows.map((row) => {
     const addr = getSubnetAddressing(row.subnet, useFirstIps, 1);
     const servers = (row.dhcpServers || []).slice(0, 3);
@@ -471,6 +499,7 @@ export const rowsToCsv = (rows: VlanRow[], useFirstIps = true, layer2Only = fals
       servers[2] || '',
       addr.virtualIp,
       prefixToMask(addr.prefix),
+      resolveVrf(row.vrf, defaultVrf),
     ].join(',');
   });
   return [header, ...body].join('\n');
