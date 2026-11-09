@@ -269,6 +269,29 @@ const splitVlanCsvLine = (line: string): string[] => {
 const normalizeVlanHeader = (header: string): string =>
   header.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+// UTF-7 spreadsheet exports encode punctuation as shifted UTF-16BE base64.
+// Detect it in the heading before decoding so ordinary UTF-8 values stay intact.
+const decodeVlanCsvEncoding = (text: string): string => {
+  const decode = (value: string): string => value.replace(/\+([A-Za-z0-9/]*?)-/g, (original, encoded: string) => {
+    if (!encoded) return '+';
+    try {
+      const bytes = atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, '='));
+      if (bytes.length % 2 !== 0) return original;
+      let decoded = '';
+      for (let i = 0; i < bytes.length; i += 2) {
+        decoded += String.fromCharCode(bytes.charCodeAt(i) * 256 + bytes.charCodeAt(i + 1));
+      }
+      return decoded;
+    } catch {
+      return original;
+    }
+  });
+  const heading = text.split(/\r?\n/).find(line => line.trim() && !line.trim().startsWith('#')) || '';
+  if (!/\+[A-Za-z0-9/]+-/.test(heading)) return text;
+  const decodedHeaders = splitVlanCsvLine(decode(heading)).map(normalizeVlanHeader);
+  return decodedHeaders.includes('vlanid') ? decode(text) : text;
+};
+
 export const parseVlanCsv = (
   text: string,
   isidOptions: IsidOptions,
@@ -277,7 +300,7 @@ export const parseVlanCsv = (
   const errors: string[] = [];
   const rows: VlanRow[] = [];
 
-  const lines = text
+  const lines = decodeVlanCsvEncoding(text)
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0 && !l.startsWith('#'));

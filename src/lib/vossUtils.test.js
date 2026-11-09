@@ -6,6 +6,28 @@ const row = { vlanId: 100, name: 'Data', subnet: '10.10.100.0/24', isid: 10100 }
 const options = { useFirstIps: true, switchCount: 2, priority: 200, backupMaster: true, memberPorts: '', dhcpEnabled: true, dhcpServers: ['10.1.1.10'] };
 
 describe('VOSS routing tables', () => {
+  test('UTF-7 vlan+AF8-id headers and encoded row values import correctly', () => {
+    const csv = 'vlan+AF8-id,vlan+AF8-name,subnet,isid,master+AF8-switch,dhcp+AF8-enabled,dhcp+AF8-server+AF8-1,vrf\n2100,Data+AF8-Net,10.21.0.0/24,12100,1,yes,10.1.1.10,Corp+AF8-VRF\n2200,Voice,10.22.0.0/24,12200,2,no,,GlobalRouter\n2300,Wireless,10.23.0.0/24,12300,,no,,Guest';
+    const parsed = parseVlanCsv(csv, isid);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows.map(r => r.vlanId)).toEqual([2100, 2200, 2300]);
+    expect(parsed.rows[0]).toMatchObject({ name: 'Data_Net', vrf: 'Corp_VRF', masterSwitch: 1, dhcpEnabled: true, dhcpServers: ['10.1.1.10'] });
+    expect(validateRows(parsed.rows)).toEqual([]);
+    expect(generateVossVrrpConfig(parsed.rows, options)).toContain('interface vlan 2100\nvrf Corp_VRF\nip address');
+  });
+
+  test('UTF-7 simplified Layer 2 CSV is decoded without adding routing', () => {
+    const parsed = parseVlanCsv('vlan+AF8-id,vlan+AF8-name,isid\n2100,Data+AF8-Net,12100', isid, true);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0]).toMatchObject({ vlanId: 2100, name: 'Data_Net', isid: 12100, subnet: '' });
+  });
+
+  test('ordinary UTF-8 values resembling UTF-7 remain unchanged', () => {
+    const parsed = parseVlanCsv('vlan_id,vlan_name,subnet,isid\n2100,Data+AF8-Net,10.21.0.0/24,12100', isid);
+    expect(parsed.errors).toEqual([]);
+    expect(parsed.rows[0].name).toBe('Data+AF8-Net');
+  });
+
   test('spreadsheet headings accept VLAN IDs 2100, 2200 and 2300', () => {
     for (const header of ['VLAN ID,VLAN Name,Subnet,I-SID,VRF', 'vlan_id,vlan_name,subnet,isid,vrf', 'VLAN-ID,VLAN-Name,Subnet,I SID,VRF']) {
       for (const quoted of [false, true]) {
