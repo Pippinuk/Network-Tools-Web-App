@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { CSV_TEMPLATE, DEFAULT_VRF, parseVlanCsv, resolveVrf, rowsToCsv, validateRows, generateVossVrrpConfig } from './vossUtils';
+import { CSV_TEMPLATE, DEFAULT_VRF, parseMltIds, parseVlanCsv, resolveVrf, rowsToCsv, validateRows, generateVossVrrpConfig } from './vossUtils';
 
 const isid = { mode: 'offset', base: 10000, prefix: 1 };
 const row = { vlanId: 100, name: 'Data', subnet: '10.10.100.0/24', isid: 10100 };
