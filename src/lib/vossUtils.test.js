@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { CSV_TEMPLATE, DEFAULT_VRF, parseVlanCsv, resolveVrf, rowsToCsv, validateRows, generateVossVrrpConfig } from './vossUtils';
+import { CSV_TEMPLATE, DEFAULT_VRF, parseMltIds, parseVlanCsv, resolveVrf, rowsToCsv, validateRows, generateVossVrrpConfig } from './vossUtils';
 
 const isid = { mode: 'offset', base: 10000, prefix: 1 };
 const row = { vlanId: 100, name: 'Data', subnet: '10.10.100.0/24', isid: 10100 };
@@ -108,6 +108,19 @@ describe('VOSS routing tables', () => {
       expect(validateRows([{ ...row, vrf }]).length).toBeGreaterThan(0);
       expect(() => generateVossVrrpConfig([{ ...row, vrf }], options)).toThrow();
     }
+  });
+
+  test('multiple MLT/SMLT IDs each produce a vlan mlt command', () => {
+    expect(parseMltIds('1, 2 3;2')).toEqual([1, 2, 3]);
+    expect(parseMltIds('')).toEqual([]);
+    expect(parseMltIds('0, 513, abc, 7')).toEqual([7]);
+    const config = generateVossVrrpConfig([row], { ...options, mltIds: [1, 2, 3] });
+    expect(config).toContain('vlan mlt 100 1');
+    expect(config).toContain('vlan mlt 100 2');
+    expect(config).toContain('vlan mlt 100 3');
+    const l2 = generateVossVrrpConfig([{ ...row, subnet: '' }], { ...options, layer2Only: true, mltIds: [4, 5] });
+    expect(l2).toContain('vlan mlt 100 4');
+    expect(l2).toContain('vlan mlt 100 5');
   });
 
   test('Layer 2-only output has no routing, VRRP or DHCP commands', () => {

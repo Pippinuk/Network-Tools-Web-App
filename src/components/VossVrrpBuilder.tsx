@@ -40,6 +40,7 @@ import {
   computeIsid,
   generateVossVrrpConfig,
   getSubnetAddressing,
+  parseMltIds,
   parseNumberList,
   parseVlanCsv,
   rowsToCsv,
@@ -160,7 +161,7 @@ const VossVrrpBuilder: React.FC = () => {
   );
 
   const options: VrrpOptions = useMemo(
-    () => ({ ...vrrp, vrid, layer2Only, mltId: mltId.trim() ? parseInt(mltId, 10) : undefined }),
+    () => ({ ...vrrp, vrid, layer2Only, mltIds: parseMltIds(mltId) }),
     [vrrp, vrid, mltId, layer2Only]
   );
 
@@ -503,8 +504,8 @@ const VossVrrpBuilder: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="mltId">MLT / SMLT ID (optional)</Label>
-              <Input id="mltId" value={mltId} onChange={(e) => setMltId(e.target.value)} placeholder="e.g. 1" />
+              <Label htmlFor="mltId">MLT / SMLT IDs (optional)</Label>
+              <Input id="mltId" value={mltId} onChange={(e) => setMltId(e.target.value)} placeholder="e.g. 1, 2, 3" />
             </div>
           </div>
 

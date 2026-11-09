@@ -112,7 +112,7 @@ export interface VrrpOptions {
   priority: number;
   backupMaster: boolean;
   memberPorts: string;
-  mltId?: number;
+  mltIds?: number[];
   vrid?: VridOptions;
   masterMode?: MasterMode;
   layer2Only?: boolean;
@@ -129,6 +129,18 @@ export const isReservedVlanId = (id: number): boolean =>
 
 export const isValidVlanId = (id: number): boolean =>
   Number.isInteger(id) && id >= 2 && id <= 4094;
+
+export const isValidMltId = (id: number): boolean =>
+  Number.isInteger(id) && id >= 1 && id <= 512;
+
+// Accepts comma/space-separated MLT or SMLT IDs; invalid entries are dropped.
+export const parseMltIds = (input: string): number[] => {
+  const ids = input
+    .split(/[\s,;]+/)
+    .map((part) => parseInt(part, 10))
+    .filter(isValidMltId);
+  return [...new Set(ids)];
+};
 
 export const isValidIsid = (isid: number): boolean =>
   Number.isInteger(isid) && isid >= 1 && isid <= 16777215;
@@ -437,7 +449,7 @@ export const generateVossL2Config = (rows: VlanRow[], vrrp: VrrpOptions): string
     if (vrrp.memberPorts.trim()) {
       lines.push(`vlan members add ${row.vlanId} ${vrrp.memberPorts.trim()} portmember`);
     }
-    if (vrrp.mltId) lines.push(`vlan mlt ${row.vlanId} ${vrrp.mltId}`);
+    for (const mltId of vrrp.mltIds ?? []) lines.push(`vlan mlt ${row.vlanId} ${mltId}`);
     lines.push('');
   });
 
@@ -484,7 +496,7 @@ export const generateVossVrrpConfig = (rows: VlanRow[], vrrp: VrrpOptions): stri
       if (vrrp.memberPorts.trim()) {
         lines.push(`vlan members add ${row.vlanId} ${vrrp.memberPorts.trim()} portmember`);
       }
-      if (vrrp.mltId) lines.push(`vlan mlt ${row.vlanId} ${vrrp.mltId}`);
+      for (const mltId of vrrp.mltIds ?? []) lines.push(`vlan mlt ${row.vlanId} ${mltId}`);
       lines.push(`interface vlan ${row.vlanId}`);
       if (vrf !== DEFAULT_VRF) lines.push(`vrf ${vrf}`);
       lines.push(`ip address ${interfaceIp} ${prefixToMask(addr.prefix)}`);
